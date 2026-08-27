@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Far Edge Studio — Prompt Composer</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <header>
+    <h1>Far Edge Studio</h1>
+    <p class="subtitle">Prompt Composer — Phase 1 MVP</p>
+  </header>
+
+  <section id="palette">
+    <h2>Blocks</h2>
+    <p class="hint">Drag a block into the builder below.</p>
+    <div class="palette-row">
+      <div class="block-chip" draggable="true" data-block-type="scenario">Scenario</div>
+      <div class="block-chip" draggable="true" data-block-type="expertise">Expertise</div>
+      <div class="block-chip" draggable="true" data-block-type="ask">Ask</div>
+    </div>
+  </section>
+
+  <section id="canvas-section">
+    <h2>Builder</h2>
+    <div id="canvas" class="drop-zone">
+      <p class="empty-hint">Drag blocks here to build a prompt.</p>
+    </div>
+    <textarea id="preview" readonly placeholder="Assembled prompt preview will appear here..."></textarea>
+    <div class="row">
+      <button id="save-prompt-btn">Save Prompt</button>
+      <button id="clear-canvas-btn" class="secondary">Clear</button>
+    </div>
+  </section>
+
+  <section id="library-section">
+    <h2>Library</h2>
+    <input id="filter-input" type="text" placeholder="Filter saved prompts..." />
+    <ul id="library-list"></ul>
+  </section>
+
+  <section id="destination-section">
+    <h2>Send To</h2>
+    <button id="refresh-tabs-btn" class="secondary">Refresh open ChatGPT tabs</button>
+    <ul id="tab-list"></ul>
+    <button id="insert-btn">Insert into selected tab(s)</button>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
