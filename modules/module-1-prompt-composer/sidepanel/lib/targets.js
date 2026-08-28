@@ -5,6 +5,7 @@
 
 import { state } from './state.js';
 import { getTabLabels, saveTabLabels } from './storage.js';
+import { updateCostEstimate } from './usage.js';
 
 const tabListEl = document.getElementById('tab-list');
 
@@ -46,6 +47,7 @@ export async function refreshTabs() {
   }
 
   renderTabList();
+  updateCostEstimate();
 }
 
 export function renderTabList() {
@@ -69,6 +71,7 @@ export function renderTabList() {
     checkbox.addEventListener('change', () => {
       if (checkbox.checked) state.selectedTabIds.add(tab.id);
       else state.selectedTabIds.delete(tab.id);
+      updateCostEstimate();
     });
     li.appendChild(checkbox);
 

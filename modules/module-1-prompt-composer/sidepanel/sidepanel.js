@@ -15,10 +15,11 @@
 //   insert.js     Insert, the variable form, clipboard fallback
 //   optimize.js   the platform-targeted rewrite loop
 //   replies.js    capture, save, and reuse
+//   usage.js      the Usage tab and the composer's cost meter
 //
-// The panel has two tabs — Prompts and Replies — over a shared Chat
-// tabs list, because both act on the same ticked tabs and duplicating
-// that list would let the two drift apart.
+// The panel has three tabs — Prompts, Replies and Usage — over a shared
+// Chat tabs list, because Prompts and Replies act on the same ticked
+// tabs and duplicating that list would let the two drift apart.
 
 import { initTabs } from './lib/ui.js';
 import { loadBlockTypes, renderPalette, openBlockManager } from './lib/blocks.js';
@@ -28,6 +29,7 @@ import { refreshTabs, initTargets } from './lib/targets.js';
 import { initInsert } from './lib/insert.js';
 import { initOptimize } from './lib/optimize.js';
 import { renderCaptures, renderResponses, initReplies } from './lib/replies.js';
+import { loadUsage, renderUsage, updateCostEstimate, initUsage } from './lib/usage.js';
 
 // blocks.js owns the palette but shouldn't have to know how the builder
 // renders, so the two are joined here rather than importing each other.
@@ -48,8 +50,11 @@ async function init() {
   initInsert();
   initOptimize();
   initReplies();
+  initUsage();
 
   await loadBlockTypes();
+  await loadUsage();
+  renderUsage();
   refreshBlockUI();
   updatePreview();
 
@@ -57,6 +62,7 @@ async function init() {
   renderCaptures();
   await renderResponses();
   await refreshTabs();
+  updateCostEstimate();
 }
 
 init();

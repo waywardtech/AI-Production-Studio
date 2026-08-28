@@ -39,7 +39,7 @@ docs refer to this module.
 | M1-7 Destination picker | ✅ | Checkbox list, multi-tab select supported |
 | M1-8 Injection engine | ✅ | Multi-strategy (contenteditable + textarea) across all three platforms, see caveat below |
 | M1-9 Clipboard fallback | ✅ | Auto-triggers on injection failure with a clear toast |
-| M1-10 Usage scrape (stretch) | ❌ Not started | Deferred — flagged as stretch/1.5 in the ticket doc |
+| M1-10 / M1.5-8 Usage scrape | ⚠️ Partial | Best-effort text scrape; these services rarely show a figure — see below |
 | M1-11 Variable placeholders | ✅ | See below |
 | M1.5-1 Format block | ✅ | Ships as a default block type; block types are editable — see below |
 | M1.5-2 Optimize step | ✅ | Runs in a chat you already have open, no bundled API call — see below |
@@ -144,6 +144,35 @@ combines with whichever tag is selected.
 
 The ✎ on a saved prompt edits its name, tags and Status.
 
+## Usage tab (CORE-8 / CORE-9)
+
+A third tab tracks what each service has left, with a meter that drains
+as quota is spent and turns red at a threshold you set per service
+(default 10% remaining).
+
+**Read the note on the tab before trusting the scrape.** None of
+ChatGPT, Claude or Gemini publishes a usage API, and none of them
+reliably renders a quota either — what's on screen depends on your plan,
+the model, and how close to a limit you are. So the tab is built the way
+CORE-8 asks for it: **manual entry via ✎ is the primary path and always
+works**, and **Read from tabs** is a best-effort text scrape layered on
+top that says plainly when it finds nothing, naming the tabs it couldn't
+read. It recognises phrasings like "12 messages remaining", "18 of your
+40 messages" and "5/25 prompts"; anything else needs entering by hand.
+
+Services can be measured in messages, tokens or USD, and **Add service**
+covers anything else that burns budget — an image generator, an API
+spend cap.
+
+### Cost estimate in the composer
+
+Under the builder preview sits the spec's other P0 item: a rough token
+count for the assembled prompt, plus a meter for each service you're
+about to send to, which turns red when that service is at or below its
+threshold. The token figure is roughly four characters per token — a
+"is this prompt huge?" signal, labelled as an estimate, not a billing
+number.
+
 ## Capturing replies (M2-1 / M2-2 / M2-3)
 
 **Capture** pulls work back out of the tabs ticked under **Chat tabs**:
@@ -195,6 +224,7 @@ sidepanel/
     insert.js         Insert, the variable form, clipboard fallback
     optimize.js       the platform-targeted rewrite loop
     replies.js        capture, save, and reuse
+    usage.js          the Usage tab and the composer's cost meter
 ```
 
 `variables.js` is deliberately dependency-free so it can be imported and
@@ -273,8 +303,9 @@ is the one thing to fix.
 
 ## Next up
 
-Phases 1 and 1.5 are complete. What's left is blocked on Phase 0 or
-still open in Phase 2: CORE-1/CORE-4 (Google auth and the Drive-backed
-repository, which everything currently stubbed to local storage is
-waiting on), M2-4/M2-5 (export to Drive), M2-6 (reformat pipeline), and
-CORE-8/M1-10 (the Usage tab and its scrapers).
+Phases 1 and 1.5 are complete, as is the Usage tab. What's left is
+mostly blocked on Phase 0: CORE-1/CORE-4 (Google auth and the
+Drive-backed repository, which the prompt library, saved replies, block
+types and usage figures are all waiting on), then M2-4/M2-5 (export to
+Drive) and M2-6 (the reformat pipeline). Module 3 (visual reference
+pipeline) is still unstarted.

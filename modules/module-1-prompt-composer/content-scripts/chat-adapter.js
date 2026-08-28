@@ -1,6 +1,7 @@
 // Edge Studio — chat page adapter (content script)
 // Covers: M1-8 (injection), M1.5-4/M1.5-5 (Claude + Gemini adapters),
-//         M2-1/M2-2 (response + selection capture)
+//         M2-1/M2-2 (response + selection capture),
+//         M1-10/M1.5-8 (best-effort usage scrape)
 //
 // One adapter for all three platforms rather than three near-identical
 // files: the message plumbing and the insertion strategies are the
@@ -185,6 +186,73 @@ function captureSelection() {
   };
 }
 
+// ---------- M1-10 / M1.5-8: best-effort usage scrape ----------
+//
+// None of these platforms publishes a usage API, and none of them
+// reliably renders a quota either — what's on screen depends on plan,
+// model and how close to a limit you are. So this looks for the
+// phrasings they use *when* they show something, and returns a plain
+// "nothing here" the rest of the time. Manual entry in the Usage tab is
+// the primary path; this is a convenience on top of it.
+
+const USAGE_PATTERNS = [
+  // "12 messages remaining", "3 prompts left"
+  {
+    re: /(\d[\d,]*)\s+(?:messages?|prompts?|requests?)\s+(?:remaining|left)/i,
+    read: (m) => ({ remaining: num(m[1]) }),
+  },
+  // "12 of 40 messages", "12/40 messages"
+  {
+    re: /(\d[\d,]*)\s*(?:of|\/)\s*(\d[\d,]*)\s+(?:messages?|prompts?|requests?)/i,
+    read: (m) => ({ used: num(m[1]), limit: num(m[2]) }),
+  },
+  // "You've used 18 of your 40 messages"
+  {
+    re: /used\s+(\d[\d,]*)\s+of\s+(?:your\s+)?(\d[\d,]*)/i,
+    read: (m) => ({ used: num(m[1]), limit: num(m[2]) }),
+  },
+];
+
+function num(raw) {
+  const n = Number(String(raw).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+function captureUsage() {
+  const platform = currentPlatform();
+  if (!platform) {
+    return { success: false, reason: 'Edge Studio does not handle this site.' };
+  }
+
+  // Scan visible text only. innerText already skips hidden nodes, which
+  // keeps this away from markup that isn't actually on screen.
+  const haystack = (document.body?.innerText || '').slice(0, 20000);
+
+  for (const pattern of USAGE_PATTERNS) {
+    const match = haystack.match(pattern.re);
+    if (!match) continue;
+
+    const read = pattern.read(match);
+    // A "remaining" reading only becomes used/limit once a limit is
+    // known, so pass it through and let the panel keep its own limit.
+    const result = {
+      success: true,
+      raw: match[0].trim(),
+      platform: platform.id,
+      platformLabel: platform.label,
+      used: read.used ?? null,
+      limit: read.limit ?? null,
+      remaining: read.remaining ?? null,
+    };
+    return result;
+  }
+
+  return {
+    success: false,
+    reason: `No usage figure shown on this ${platform.label} page.`,
+  };
+}
+
 // The background worker may inject this file programmatically into a tab
 // that was already open before the extension loaded. If the manifest
 // content script did run after all, that would register a second
@@ -204,6 +272,10 @@ if (!window.__edgeStudioAdapterListenerRegistered) {
 
     if (message.type === 'EDGE_STUDIO_CAPTURE_SELECTION') {
       sendResponse(captureSelection());
+    }
+
+    if (message.type === 'EDGE_STUDIO_CAPTURE_USAGE') {
+      sendResponse(captureUsage());
     }
   });
 }

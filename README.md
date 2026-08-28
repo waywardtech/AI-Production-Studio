@@ -22,8 +22,8 @@ modules/
 The extension is named **Edge Studio**. Its directory keeps the
 `module-1-prompt-composer` name the spec and ticket docs use.
 
-The panel has two tabs, **Prompts** and **Replies**, over a shared list
-of open chat tabs.
+The panel has three tabs — **Prompts**, **Replies** and **Usage** — over
+a shared list of open chat tabs.
 
 **Module 1 (Prompt Composer & Injection)** — Phases 1 and 1.5 complete:
 block builder with editable block types, tab detection/labeling and
@@ -40,6 +40,12 @@ reformat pipeline (M2-6) are still open.
 
 See `modules/module-1-prompt-composer/README.md` for install steps and a
 ticket-by-ticket status table.
+
+**Core — Usage tracking (CORE-8/CORE-9)** — built: per-service
+consumption meters with editable warning thresholds, plus a live cost
+estimate in the composer. Reading figures off the chat pages is
+best-effort; manual entry is the reliable path, for the reasons the
+module README sets out.
 
 **Core (auth/Drive)** and **Module 3 (Visual Reference Pipeline)** —
 spec'd and ticketed, not yet built.

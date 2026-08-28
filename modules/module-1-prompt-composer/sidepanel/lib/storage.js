@@ -31,6 +31,15 @@ export async function saveBlockTypes(blockTypes) {
   await chrome.storage.local.set({ blockTypes });
 }
 
+export async function getUsage() {
+  const { usage } = await chrome.storage.local.get('usage');
+  return usage || null;
+}
+
+export async function saveUsage(usage) {
+  await chrome.storage.local.set({ usage });
+}
+
 export async function getRememberedValues() {
   const { variableValues } = await chrome.storage.local.get('variableValues');
   return variableValues || {};

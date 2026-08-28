@@ -4,6 +4,7 @@ import { state, newBlockId } from './state.js';
 import { blockLabel, defaultBlockTypeId } from './blocks.js';
 import { openModal } from './modal.js';
 import { showToast, switchTab } from './ui.js';
+import { updateCostEstimate } from './usage.js';
 
 const canvasEl = document.getElementById('canvas');
 const previewEl = document.getElementById('preview');
@@ -17,6 +18,9 @@ export function updatePreview() {
     .map((b) => (b.text || '').trim())
     .filter(Boolean)
     .join('\n\n');
+  // The cost of what's about to be sent should be visible before
+  // Insert, not after (spec §Usage, P0).
+  updateCostEstimate();
 }
 
 export function renderCanvas() {

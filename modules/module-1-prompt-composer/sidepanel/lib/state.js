@@ -13,6 +13,7 @@ export const state = {
   selectedTabIds: new Set(),
   captures: [], // staged, unsaved: { id, tabId, label, kind, text, url, capturedAt }
   activeTagFilter: null, // null = all tags
+  usage: { services: [] }, // { id, label, platform, unit, used, limit, thresholdPct, updatedAt, source }
 };
 
 export function newBlockId(type) {

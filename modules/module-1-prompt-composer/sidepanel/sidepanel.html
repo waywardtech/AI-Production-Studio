@@ -28,6 +28,8 @@
             aria-controls="tab-prompts" id="tabbtn-prompts">Prompts</button>
     <button class="tab-btn" data-tab="replies" role="tab" aria-selected="false"
             aria-controls="tab-replies" id="tabbtn-replies">Replies</button>
+    <button class="tab-btn" data-tab="usage" role="tab" aria-selected="false"
+            aria-controls="tab-usage" id="tabbtn-usage">Usage</button>
   </nav>
 
   <!-- ---------------- PROMPTS ---------------- -->
@@ -48,6 +50,7 @@
         <p class="empty-hint">Drag blocks here to build a prompt.</p>
       </div>
       <textarea id="preview" readonly placeholder="Assembled prompt preview will appear here..."></textarea>
+      <div id="cost-meter" class="cost-meter hidden"></div>
       <div class="row">
         <button id="insert-btn">Insert</button>
         <button id="optimize-btn" class="secondary">Optimize</button>
@@ -84,6 +87,22 @@
       <h2>Saved Replies</h2>
       <input id="response-filter-input" type="text" placeholder="Filter saved replies..." />
       <ul id="response-list"></ul>
+    </section>
+  </div>
+
+  <!-- ---------------- USAGE ---------------- -->
+  <div id="tab-usage" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabbtn-usage">
+    <section id="usage-section">
+      <h2>Consumption</h2>
+      <p class="hint">None of these services publishes a usage API, and
+        most only show a figure when you're near a limit. Enter what you
+        know with ✎; <strong>Read from tabs</strong> tries to find one on
+        the open pages.</p>
+      <div id="usage-list"></div>
+      <div class="row">
+        <button id="usage-read-btn">Read from tabs</button>
+        <button id="usage-add-btn" class="secondary">Add service</button>
+      </div>
     </section>
   </div>
 

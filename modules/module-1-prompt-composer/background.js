@@ -93,10 +93,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // --- M2-1 / M2-2: capture relays ---
+  // --- M2-1 / M2-2 / CORE-8: capture relays ---
   if (
     message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE' ||
-    message.type === 'EDGE_STUDIO_CAPTURE_SELECTION'
+    message.type === 'EDGE_STUDIO_CAPTURE_SELECTION' ||
+    message.type === 'EDGE_STUDIO_CAPTURE_USAGE'
   ) {
     relayToTab(message.tabId, { type: message.type }).then(sendResponse);
     return true;

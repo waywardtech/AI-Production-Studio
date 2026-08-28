@@ -35,13 +35,15 @@ Capture a full chat transcript from a tracked tab and save it as a timestamped D
 **CORE-7 — Repository export/import (P1)**
 Export/import the repository index as a portable JSON bundle (not the underlying Drive files, which stay in place).
 
-**CORE-8 — Usage tab shell**
+**CORE-8 — Usage tab shell** ✅ *Implemented*
 Build the Usage tab UI: per-service rows with a percentage/thermometer indicator.
 *Acceptance:* Renders correctly with placeholder/manually-entered data; ready to receive live data as sources come online per-module.
+*Built as:* Third panel tab. One row per service with a draining meter, editable via ✎. Measured in messages, tokens or USD; custom services can be added for anything else that burns budget. The spec's inline cost estimate also landed — a rough token count under the builder preview plus a meter per service being sent to.
 
-**CORE-9 — Usage threshold settings**
+**CORE-9 — Usage threshold settings** ✅ *Implemented*
 Editable warning threshold per service, defaulting to 10% remaining.
 *Depends on:* CORE-8
+*Built as:* Per-service "warn at % remaining", defaulting to 10. Crossing it turns the service row and its meter red, and turns the matching chip in the composer's cost estimate red too. The meter pulses rather than flashes, and holds still under prefers-reduced-motion.
 
 ---
 
@@ -83,9 +85,10 @@ Content-script logic to insert the assembled prompt into ChatGPT's input field �
 When auto-injection isn't possible (mobile, permissions), copy the prompt to clipboard and show a clear "ready to paste" notification.
 *Acceptance:* Fallback triggers correctly on injection failure; clipboard holds the exact approved prompt.
 
-**M1-10 — Stretch: ChatGPT usage scrape**
+**M1-10 — Stretch: ChatGPT usage scrape** ⚠️ *Partial — scraping is unreliable by nature*
 First real usage-tracking source — scrape ChatGPT's own usage/quota indicator, feed into Core's Usage tab (CORE-8).
 *Priority:* P1, can slip to Phase 1.5 if scraping proves fiddly.
+*Built as:* "Read from tabs" scans visible page text for the phrasings these services use when they show a figure at all ("12 messages remaining", "18 of your 40 messages", "5/25 prompts"). It reports plainly when it finds nothing, naming the tabs it couldn't read. This is genuinely fiddly as the ticket predicted: none of the three publishes a usage API and most only surface a number near a limit, so manual entry is the primary path and the scrape is a convenience on top.
 
 **M1-11 — Variable placeholders in prompts** ✅ *Implemented*
 Support `<name>` tokens (optionally prefixed, e.g. `w<current-week>`) inside blocks. On Insert, collect each unique variable via an in-panel form and substitute before injection/clipboard — the saved template keeps the raw placeholder for reuse.
@@ -131,8 +134,9 @@ Update the destination picker (M1-7) to support selecting targets across all thr
 *Depends on:* M1.5-4, M1.5-5, M1.5-6
 *Built as:* The Chat tabs list is platform-agnostic — tick tabs across platforms and Insert reaches all of them in one send.
 
-**M1.5-8 — Claude + Gemini usage scrape (P1)**
+**M1.5-8 — Claude + Gemini usage scrape (P1)** ⚠️ *Partial — same caveat as M1-10*
 Extend usage tracking (CORE-8/M1-10) to scrape Claude's and Gemini's own usage indicators.
+*Built as:* The same shared scrape runs on all three platforms, since it works on visible text rather than per-platform markup.
 
 ---
 
