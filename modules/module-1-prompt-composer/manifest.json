@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Edge Studio",
   "short_name": "Edge Studio",
-  "version": "0.3.0",
-  "description": "Block-based prompt builder with drag-and-drop composition, one-click injection into ChatGPT, and response capture.",
+  "version": "0.4.0",
+  "description": "Tabbed prompt composer and reply manager: block-based prompt building with custom block types and tags, one-click injection into ChatGPT, platform-targeted optimization, and reply capture.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

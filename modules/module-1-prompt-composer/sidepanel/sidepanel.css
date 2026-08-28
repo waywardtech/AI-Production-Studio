@@ -170,7 +170,7 @@ button:hover {
   margin-bottom: 6px;
 }
 
-#library-list, #tab-list {
+#tab-list, .library-group-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -180,9 +180,6 @@ button:hover {
 }
 
 .library-item, .tab-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   background: #1c1d22;
   border: 1px solid #2b2d34;
   border-radius: 6px;
@@ -190,9 +187,24 @@ button:hover {
   font-size: 12px;
 }
 
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .library-item .title {
   flex: 1;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .library-item .status-tag {
@@ -432,4 +444,217 @@ button.danger {
 .capture-card button {
   font-size: 11px;
   padding: 5px 8px;
+}
+
+/* ---------- Tabs, section heads, tag grouping, block manager ---------- */
+
+.tabbar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #2b2d34;
+  margin: 14px 0 4px;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8b8d96;
+  cursor: pointer;
+}
+
+.tab-btn:hover {
+  color: #d3d4d9;
+  filter: none;
+}
+
+.tab-btn.active {
+  color: #e7e7ea;
+  border-bottom-color: #4d6bff;
+}
+
+.tab-panel.hidden {
+  display: none;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-head h2 {
+  flex: 1;
+}
+
+.link-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #7f92ff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  filter: brightness(1.2);
+  text-decoration: underline;
+}
+
+.block-type-select {
+  flex: 1;
+  background: #14151a;
+  color: inherit;
+  border: 1px solid #3a3c45;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.row-action {
+  cursor: pointer;
+  color: #6f7178;
+  font-size: 12px;
+}
+
+.row-action:hover {
+  color: #d3d4d9;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.tag-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tag-chip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #26282f;
+  border: 1px solid #34363f;
+  color: #a9abb4;
+  cursor: pointer;
+}
+
+.tag-chip:hover {
+  color: #e7e7ea;
+  filter: none;
+}
+
+.tag-chip.filter.active {
+  background: #2f3a6b;
+  border-color: #4d6bff;
+  color: #e7e7ea;
+}
+
+.library-group-heading {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6f7178;
+  margin: 12px 0 5px;
+}
+
+.library-group-heading:first-child {
+  margin-top: 0;
+}
+
+.block-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.block-manager-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.block-manager-row input {
+  flex: 1;
+  padding: 5px 7px;
+  border-radius: 5px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+}
+
+.block-manager-add {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.block-manager-add input {
+  flex: 1;
+  padding: 5px 7px;
+  border-radius: 5px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+}
+
+.block-manager-add button {
+  flex: 0 0 auto;
+}
+
+.response-body {
+  width: 100%;
+  min-height: 90px;
+  max-height: 220px;
+  resize: vertical;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #2b2d34;
+  background: #14151a;
+  color: #c3c5cd;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-bottom: 7px;
+}
+
+/* Modal select + textarea fields */
+.variable-field select,
+.variable-field textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.variable-field textarea {
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.modal-body {
+  white-space: pre-wrap;
 }

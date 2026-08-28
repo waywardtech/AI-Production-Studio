@@ -11,64 +11,87 @@
     <p class="subtitle">Prompt Composer &amp; Response Manager</p>
   </header>
 
-  <section id="palette">
-    <h2>Blocks</h2>
-    <p class="hint">Drag a block into the builder below.</p>
-    <div class="palette-row">
-      <div class="block-chip" draggable="true" data-block-type="scenario">Scenario</div>
-      <div class="block-chip" draggable="true" data-block-type="expertise">Expertise</div>
-      <div class="block-chip" draggable="true" data-block-type="ask">Ask</div>
+  <!-- Chat tabs sit outside the Prompts/Replies tabs because both need
+       them: Prompts inserts into the ticked tabs, Replies captures from
+       them. One list, one set of tick boxes, no chance of the two
+       disagreeing. -->
+  <section id="targets-section">
+    <div class="section-head">
+      <h2>Chat tabs</h2>
+      <button id="refresh-tabs-btn" class="link-btn">Refresh</button>
     </div>
-  </section>
-
-  <section id="canvas-section">
-    <h2>Builder</h2>
-    <div id="canvas" class="drop-zone">
-      <p class="empty-hint">Drag blocks here to build a prompt.</p>
-    </div>
-    <textarea id="preview" readonly placeholder="Assembled prompt preview will appear here..."></textarea>
-    <div class="row">
-      <button id="save-prompt-btn">Save Prompt</button>
-      <button id="clear-canvas-btn" class="secondary">Clear</button>
-    </div>
-  </section>
-
-  <section id="library-section">
-    <h2>Library</h2>
-    <input id="filter-input" type="text" placeholder="Filter saved prompts..." />
-    <ul id="library-list"></ul>
-  </section>
-
-  <section id="destination-section">
-    <h2>Send To</h2>
-    <button id="refresh-tabs-btn" class="secondary">Refresh open ChatGPT tabs</button>
     <ul id="tab-list"></ul>
-    <button id="insert-btn">Insert into selected tab(s)</button>
   </section>
 
-  <section id="capture-section">
-    <h2>Capture</h2>
-    <p class="hint">Pulls from the tabs ticked above. Capture selection
-      takes whatever you've highlighted in the page.</p>
-    <div class="row">
-      <button id="capture-latest-btn" class="secondary">Latest response</button>
-      <button id="capture-selection-btn" class="secondary">Selection</button>
-    </div>
-    <div id="capture-list"></div>
-  </section>
+  <nav class="tabbar" role="tablist">
+    <button class="tab-btn active" data-tab="prompts" role="tab" aria-selected="true"
+            aria-controls="tab-prompts" id="tabbtn-prompts">Prompts</button>
+    <button class="tab-btn" data-tab="replies" role="tab" aria-selected="false"
+            aria-controls="tab-replies" id="tabbtn-replies">Replies</button>
+  </nav>
 
-  <section id="responses-section">
-    <h2>Saved Responses</h2>
-    <input id="response-filter-input" type="text" placeholder="Filter saved responses..." />
-    <ul id="response-list"></ul>
-  </section>
+  <!-- ---------------- PROMPTS ---------------- -->
+  <div id="tab-prompts" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-prompts">
+
+    <section id="palette">
+      <div class="section-head">
+        <h2>Blocks</h2>
+        <button id="manage-blocks-btn" class="link-btn">Manage</button>
+      </div>
+      <p class="hint">Drag a block into the builder below.</p>
+      <div class="palette-row" id="palette-row"></div>
+    </section>
+
+    <section id="canvas-section">
+      <h2>Builder</h2>
+      <div id="canvas" class="drop-zone">
+        <p class="empty-hint">Drag blocks here to build a prompt.</p>
+      </div>
+      <textarea id="preview" readonly placeholder="Assembled prompt preview will appear here..."></textarea>
+      <div class="row">
+        <button id="insert-btn">Insert</button>
+        <button id="optimize-btn" class="secondary">Optimize</button>
+      </div>
+      <div class="row">
+        <button id="save-prompt-btn" class="secondary">Save</button>
+        <button id="clear-canvas-btn" class="secondary">Clear</button>
+      </div>
+    </section>
+
+    <section id="library-section">
+      <h2>Library</h2>
+      <input id="filter-input" type="text" placeholder="Filter saved prompts..." />
+      <div id="tag-filter-row" class="tag-filter-row"></div>
+      <div id="library-list"></div>
+    </section>
+  </div>
+
+  <!-- ---------------- REPLIES ---------------- -->
+  <div id="tab-replies" class="tab-panel hidden" role="tabpanel" aria-labelledby="tabbtn-replies">
+
+    <section id="capture-section">
+      <h2>Capture</h2>
+      <p class="hint">Pulls from the chat tabs ticked above. Selection
+        takes whatever you've highlighted in the page.</p>
+      <div class="row">
+        <button id="capture-latest-btn">Latest response</button>
+        <button id="capture-selection-btn" class="secondary">Selection</button>
+      </div>
+      <div id="capture-list"></div>
+    </section>
+
+    <section id="responses-section">
+      <h2>Saved Replies</h2>
+      <input id="response-filter-input" type="text" placeholder="Filter saved replies..." />
+      <ul id="response-list"></ul>
+    </section>
+  </div>
 
   <div id="toast" class="toast hidden"></div>
 
-  <!-- One generic modal serves the variable prompt, the save-prompt
-       title input, and the delete confirmation. Extension side panels
-       can't rely on native window.prompt/confirm, so every dialog in
-       the panel runs through here. -->
+  <!-- One generic modal serves every dialog in the panel — variables,
+       titles, tags, block management, the optimize flow, confirmations.
+       Extension side panels can't rely on native window.prompt/confirm. -->
   <div id="modal" class="modal-overlay hidden">
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <h3 id="modal-title"></h3>

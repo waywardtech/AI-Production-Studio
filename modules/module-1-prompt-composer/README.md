@@ -1,8 +1,13 @@
 # Edge Studio
 
-A working Chrome extension covering the Phase 1 ticket set and the first
-three Phase 2 tickets from `../../docs/tickets-phase-0-2.md`. Load it,
-use it on ChatGPT today, then keep building on top of it.
+A working Chrome extension covering the Phase 1 and Phase 1.5 ticket
+sets and the first three Phase 2 tickets from
+`../../docs/tickets-phase-0-2.md`. Load it, use it on ChatGPT today,
+then keep building on top of it.
+
+The panel has two tabs — **Prompts** (build, save, tag, insert,
+optimize) and **Replies** (capture, save, reuse) — over a shared
+**Chat tabs** list, since both act on the same ticked tabs.
 
 The extension is named **Edge Studio**; the directory keeps its
 `module-1-prompt-composer` name because that's how the spec and ticket
@@ -15,9 +20,9 @@ docs refer to this module.
 3. Click **Load unpacked**
 4. Select this `modules/module-1-prompt-composer` folder
 5. Click the extension's toolbar icon to open the side panel
-6. Open a `chatgpt.com` tab, click **Refresh open ChatGPT tabs** in the
-   side panel, build a prompt, tick the tab, and click **Insert**
-7. To pull work back out, tick a tab and use **Capture → Latest
+6. Open a `chatgpt.com` tab, click **Refresh** under Chat tabs, tick
+   the tab, build a prompt on the **Prompts** tab, and click **Insert**
+7. To pull work back out, switch to **Replies** and use **Latest
    response** (or highlight text in the page and use **Selection**)
 
 ## What's implemented
@@ -35,6 +40,10 @@ docs refer to this module.
 | M1-9 Clipboard fallback | ✅ | Auto-triggers on injection failure with a clear toast |
 | M1-10 Usage scrape (stretch) | ❌ Not started | Deferred — flagged as stretch/1.5 in the ticket doc |
 | M1-11 Variable placeholders | ✅ | See below |
+| M1.5-1 Format block | ✅ | Ships as a default block type; block types are editable — see below |
+| M1.5-2 Optimize step | ✅ | Runs in a chat you already have open, no bundled API call — see below |
+| M1.5-3 Optimize result intake | ✅ | Scraped reply is shown for approve / edit / copy before it touches the builder |
+| M1.5-4/5/6/7 Claude + Gemini | ❌ Not started | Optimization can *target* them; injecting into them needs their DOM adapters |
 | M2-1 Response capture panel | ✅ | Captures the latest response, or the page selection, per ticked tab |
 | M2-2 Select & save | ✅ | Staged captures are editable before saving, which is also how "save just this section" works |
 | M2-3 Send to prompt | ✅ | Drops a capture or saved response into the builder as a Scenario block |
@@ -79,9 +88,61 @@ prefilled (and pre-selected, so it's easy to overwrite) the next time
 that name comes up, since most variables — a client name, a session
 date — repeat across inserts.
 
-## Capturing responses (M2-1 / M2-2 / M2-3)
+## Block types (M1-2 / M1.5-1)
 
-**Capture** pulls work back out of the tabs ticked in **Send To**:
+The palette ships with Scenario, Expertise, Ask and Format. **Manage**
+opens an editor where they can be renamed, removed, or added to — a
+studio that thinks in "Guard Rails" or "Reference" blocks can have
+those instead.
+
+Renaming keeps a block type's underlying id, so saved prompts using it
+follow the new name. Removing one leaves existing blocks working; they
+just show the raw id, and the type stays selectable on those blocks so
+switching away from it is a deliberate choice rather than silent.
+
+Every block in the builder carries a **type dropdown**, so a block typed
+as Ask that should have been a Scenario is one click to change, with its
+text untouched.
+
+## Optimize (M1.5-2 / M1.5-3)
+
+**Optimize** rewrites the current prompt for a chosen platform. Per
+spec decision #4 it never calls an LLM API — it uses a chat you already
+have open:
+
+1. Pick which open chat does the work, and which system the result
+   should be tuned for (ChatGPT, Claude or Gemini).
+2. Edge Studio writes an optimization request into that chat. It does
+   **not** press send — the extension never submits anything in your
+   chat, so press Enter there yourself.
+3. It then watches that tab and waits for the answer to finish arriving
+   rather than scraping a half-streamed reply. **Use latest now** grabs
+   whatever is there if you'd rather not wait.
+4. The rewrite comes back cleaned up (code fence and any "Here's the
+   prompt:" preamble stripped) for you to edit, **Copy**, or use to
+   **Replace builder**.
+
+The request tells the model to preserve `<angle bracket>` placeholders
+exactly and to structure with markdown headings rather than XML-style
+tags — tags would come back and be read as placeholders by the variable
+syntax above.
+
+## Tags and grouping (CORE-5)
+
+Saved prompts take free-form tags alongside the standard **Status** tag.
+Tags are stored lowercase, so `Apex`, `apex` and `APEX` are one group.
+
+With **All** selected the library groups by tag, and a prompt tagged
+both `apex` and `work` appears under both — that's the point of tagging
+rather than foldering. Selecting a tag chip narrows to a flat list of
+just that tag. The text filter matches titles, statuses and tags, and
+combines with whichever tag is selected.
+
+The ✎ on a saved prompt edits its name, tags and Status.
+
+## Capturing replies (M2-1 / M2-2 / M2-3)
+
+**Capture** pulls work back out of the tabs ticked under **Chat tabs**:
 
 - **Latest response** grabs the most recent assistant message from each
   ticked tab.
@@ -92,15 +153,22 @@ Captures are staged, not saved. Each one lands in an editable box so you
 can trim it down first — that edit *is* the "save just this section"
 step, so there's no separate selection UI to learn. From there:
 
-- **Save** stores it under **Saved Responses**, tagged `Draft`, with a
+- **Save** stores it under **Saved Replies**, tagged `Draft`, with a
   link back to the conversation it came from (the repository keeps
   references, not copies — CORE-4).
-- **To prompt** drops the text into the builder as a Scenario block, so
-  a response can feed the next prompt.
-- **Copy MD** (on saved items) puts the response on the clipboard as
+- **To builder** appends the text to the current prompt as a block.
+- **New prompt** starts a fresh prompt from it (asking first if the
+  builder isn't empty).
+- **Copy MD** (on saved items) puts the reply on the clipboard as
   Markdown with its source link.
 
-Saved responses have their own filter, which matches on title, body text
+Both **To builder** and **New prompt** use whatever you've highlighted
+in the reply's text box, falling back to the whole thing if nothing is
+highlighted — so pulling one paragraph out of a long reply and turning
+it into a prompt is a highlight and a click. Either one switches you to
+the Prompts tab so you can see what landed.
+
+Saved replies have their own filter, which matches on title, body text
 and source tab.
 
 ## What's stubbed and why (CORE-1 / CORE-4)
@@ -110,10 +178,11 @@ repository. Both need a **Google Cloud project and OAuth client ID
 registered under your own Google account** — that's not something that
 can be generated on your behalf, it has to come from you.
 
-So for this build, the prompt library and the saved responses both use
-the extension's own local storage (`chrome.storage.local`) instead. They
-work fully — save, load, filter, delete — they just aren't synced to
-Drive yet, and they're scoped to this one browser profile.
+So for this build, the prompt library, the saved replies, the block
+types and the remembered variable values all use the extension's own
+local storage (`chrome.storage.local`) instead. They work fully — save,
+load, filter, tag, delete — they just aren't synced to Drive yet, and
+they're scoped to this one browser profile.
 
 **To wire in the real thing later:**
 1. Create a project in Google Cloud Console, enable the Drive API
@@ -164,7 +233,8 @@ lands:
 
 ## Next up
 
-Per the ticket doc: Phase 1.5 (Format block, Optimize step, Claude +
-Gemini injection adapters), then the rest of Phase 2 — M2-4/M2-5
-(Drive-backed export, blocked on CORE-1/CORE-4) and M2-6 (reformat
-pipeline).
+Per the ticket doc: the Claude and Gemini injection adapters
+(M1.5-4/5/6/7) — optimization can already *target* those platforms, but
+inserting into them needs their own DOM adapters and host permissions.
+Then the rest of Phase 2 — M2-4/M2-5 (Drive-backed export, blocked on
+CORE-1/CORE-4) and M2-6 (reformat pipeline).

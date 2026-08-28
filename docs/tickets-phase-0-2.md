@@ -23,9 +23,10 @@ Auto-create the standard project folder tree in Drive (subfolders: prompts / res
 Define and implement the schema for prompt blocks, saved prompts, saved responses, and chat archives. Documents are referenced by link (not duplicated); maintain an internal link index as fallback where a platform's Drive integration is unreliable.
 *Acceptance:* CRUD works against the schema; every repository item resolves to a link, not a copy.
 
-**CORE-5 — Tagging layer (system + custom tags)**
+**CORE-5 — Tagging layer (system + custom tags)** ⚠️ *Partial — prompts and replies, local storage*
 Gmail-labels-style tagging: one standard system tag, **Status** (Draft / In Review / Approved / Archived), always present, plus user-created custom tags on top. Applies to prompts, responses, and assets.
 *Acceptance:* Every repository item carries a Status value; custom tags can be created, applied, removed, and filtered on.
+*Built as:* Saved prompts and replies carry Status (Draft / In Review / Approved / Archived, editable on prompts). Prompts also take free-form tags, stored lowercase, filtered by chip and grouped by tag with multi-tag membership. Not yet applied to visual assets, and backed by local storage until CORE-4.
 
 **CORE-6 — Chat export (transcript → Drive file)**
 Capture a full chat transcript from a tracked tab and save it as a timestamped Drive file under the project's archive folder.
@@ -95,17 +96,20 @@ Support `<name>` tokens (optionally prefixed, e.g. `w<current-week>`) inside blo
 
 ## Epic: Phase 1.5 — Optimize Step + Claude/Gemini Injection
 
-**M1.5-1 — Format block (4th prompt component)**
+**M1.5-1 — Format block (4th prompt component)** ✅ *Implemented*
 Add "Format" as an optional block type in the composer, deferred from Phase 1.
 *Acceptance:* Format block appears in the palette and is included in the assembled prompt when present.
+*Built as:* Format ships as a default block type, and the palette is now editable — block types can be renamed, removed and added, and any block in the builder can be switched to another type without retyping its text.
 
-**M1.5-2 — Optimize step UI**
+**M1.5-2 — Optimize step UI** ✅ *Implemented*
 "Optimize?" toggle in the composer flow. When yes, formats a platform-aware optimization request and hands it to whichever AI tab is already open — no bundled API call, per decision #4.
 *Acceptance:* Optimize request generates and hands off (injection or clipboard) to an open tab.
+*Built as:* Optimize button beside Insert. Dan picks which open chat runs the work and which platform (ChatGPT / Claude / Gemini) the result is tuned for. Injection fills the input but never presses send. Clipboard fallback if injection fails.
 
-**M1.5-3 — Optimize result intake**
+**M1.5-3 — Optimize result intake** ✅ *Implemented*
 Bring the optimized result back into the tool; Dan can approve as-is, edit inline, or trigger another regeneration pass.
 *Depends on:* M1.5-2
+*Built as:* Polls the worker tab and waits for the answer to stop streaming before scraping, then strips the code fence and any preamble. The result is shown in an editable box with Copy and Replace builder. Re-running Optimize is the regeneration pass.
 
 **M1.5-4 — Claude injection adapter**
 Extend the injection engine (M1-8) with a DOM adapter for claude.ai's input field.
