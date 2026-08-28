@@ -1,5 +1,5 @@
-// Far Edge Studio — ChatGPT injection content script
-// Covers: M1-8 (injection engine)
+// Edge Studio — ChatGPT page adapter (content script)
+// Covers: M1-8 (injection engine), M2-1/M2-2 (response + selection capture)
 //
 // ChatGPT's input has changed shape more than once (plain textarea,
 // then a contenteditable div). This uses a multi-strategy approach and
@@ -66,17 +66,85 @@ function injectPrompt(text) {
   }
 }
 
+// --- M2-1 / M2-2: Response and selection capture ---
+//
+// Reading responses back out has the same DOM-fragility as writing them
+// in, and the same escape hatch: if OpenAI changes their markup, these
+// two selector lists are what need updating. Both fall back to the
+// generic conversation-turn container, which has survived more redesigns
+// than the message-level attributes.
+
+function findAssistantTurns() {
+  const byRole = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (byRole.length) return [...byRole];
+
+  // Fallback: whole conversation turns. Assistant turns are the
+  // even-indexed ones in a normal alternating transcript, but rather
+  // than assume that, take every turn that isn't marked as the user's.
+  const turns = [...document.querySelectorAll('article[data-testid^="conversation-turn-"]')];
+  return turns.filter((t) => !t.querySelector('[data-message-author-role="user"]'));
+}
+
+function captureLatestResponse() {
+  const turns = findAssistantTurns();
+  if (turns.length === 0) {
+    return {
+      success: false,
+      reason: 'No assistant response found on this page yet.',
+    };
+  }
+
+  const text = (turns[turns.length - 1].innerText || '').trim();
+  if (!text) {
+    return { success: false, reason: 'The latest response looks empty.' };
+  }
+
+  return {
+    success: true,
+    text,
+    url: location.href,
+    pageTitle: document.title,
+    responseCount: turns.length,
+  };
+}
+
+function captureSelection() {
+  // Reads whatever Dan has highlighted in the page — this is what makes
+  // "save just this section" (M2-2) work without building a selection UI
+  // of our own.
+  const selection = window.getSelection();
+  const text = selection ? selection.toString().trim() : '';
+  if (!text) {
+    return { success: false, reason: 'Nothing is selected in that tab.' };
+  }
+
+  return {
+    success: true,
+    text,
+    url: location.href,
+    pageTitle: document.title,
+  };
+}
+
 // The background worker may inject this file programmatically into a tab
 // that was already open before the extension loaded. If the manifest
 // content script did run after all, that would register a second
 // listener on the same page and both would answer the same message, so
 // guard against registering twice.
-if (!window.__farEdgeInjectListenerRegistered) {
-  window.__farEdgeInjectListenerRegistered = true;
+if (!window.__edgeStudioAdapterListenerRegistered) {
+  window.__edgeStudioAdapterListenerRegistered = true;
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'FAR_EDGE_INJECT_PROMPT') {
+    if (message.type === 'EDGE_STUDIO_INJECT_PROMPT') {
       sendResponse(injectPrompt(message.text));
+    }
+
+    if (message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE') {
+      sendResponse(captureLatestResponse());
+    }
+
+    if (message.type === 'EDGE_STUDIO_CAPTURE_SELECTION') {
+      sendResponse(captureSelection());
     }
   });
 }

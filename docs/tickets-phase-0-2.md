@@ -89,6 +89,7 @@ First real usage-tracking source — scrape ChatGPT's own usage/quota indicator,
 **M1-11 — Variable placeholders in prompts** ✅ *Implemented*
 Support `<name>` tokens (optionally prefixed, e.g. `w<current-week>`) inside blocks. On Insert, collect each unique variable via an in-panel form and substitute before injection/clipboard — the saved template keeps the raw placeholder for reuse.
 *Acceptance:* Confirmed against the reference example (`w<current-week>` / `<session-date>` → `w37` / `01-28-1969`).
+*Refined since:* Variable names must be identifier-shaped, so closing tags, emails and URLs in angle brackets are no longer mistaken for variables. A blank value leaves its token untouched rather than deleting it, `\<...\>` escapes brackets outright, and last-used values are prefilled on the next insert.
 
 ---
 
@@ -129,19 +130,22 @@ Extend usage tracking (CORE-8/M1-10) to scrape Claude's and Gemini's own usage i
 
 ## Epic: Phase 2 — Module 2: Response Manager & Archive
 
-**M2-1 — Response capture panel**
+**M2-1 — Response capture panel** ✅ *Implemented (ChatGPT only)*
 Surface the latest response from each tracked, open tab in a dedicated panel.
 *Depends on:* M1.5-6 for full 3-platform coverage (can ship ChatGPT-only first and extend)
 *Acceptance:* Panel shows current response text per open, labeled tab.
+*Built as:* Capture section in the side panel, pulling from the ticked destination tabs. Captures either the latest assistant message or the current page selection.
 
-**M2-2 — Select & save (full response or selection)**
+**M2-2 — Select & save (full response or selection)** ✅ *Implemented (local storage)*
 Let Dan select all or part of a response and save it to the repository, tagged and linked to its source tab/project.
 *Depends on:* CORE-4, CORE-5
 *Acceptance:* Saved item appears in the repository, correctly tagged (Status) and linked to source.
+*Built as:* Staged captures are editable before saving, so trimming a capture down is the same action as saving a selection. Saved items carry Status `Draft` and a `source` link (platform, tab label, conversation URL). Backed by `chrome.storage.local` until CORE-4 lands, same stand-in as M1-3.
 
-**M2-3 — "Send to prompt" action**
+**M2-3 — "Send to prompt" action** ✅ *Implemented*
 Route a saved response, or a selection, back into the Prompt Composer (M1-2) as input for a follow-up.
 *Depends on:* M1-2, M2-2
+*Built as:* "To prompt" on either a staged capture or a saved response, appending the text to the builder as a Scenario block.
 
 **M2-4 — Gemini native-save integration (first pass)**
 Where Gemini's native save-to-Drive works, use it as the default path per decision #5 ("start with whichever's easiest").
@@ -154,8 +158,9 @@ For ChatGPT/Claude (and Gemini if native save proves unreliable), implement the 
 **M2-6 — Reformat pipeline (P1)**
 Select content → specify a reformat instruction → send to another chat/task → auto-file the result to the correct Drive location.
 
-**M2-7 — Alternate export formats (P1)**
+**M2-7 — Alternate export formats (P1)** ⚠️ *Partial*
 Export saved responses to plain text/Markdown/PDF in addition to the default.
+*Built as:* "Copy MD" puts a saved response on the clipboard as Markdown, including its source link. Writing actual files waits on the Drive work in CORE-4/M2-5.
 
 ---
 

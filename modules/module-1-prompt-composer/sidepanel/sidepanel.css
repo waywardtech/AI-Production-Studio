@@ -288,6 +288,13 @@ button.danger {
   color: #fff;
 }
 
+.modal-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8d8f99;
+}
+
 .variable-field {
   margin-bottom: 8px;
 }
@@ -313,4 +320,116 @@ button.danger {
   background: #14151a;
   color: #e7e7ea;
   font-size: 12px;
+}
+
+/* ---------- M2-1/M2-2: capture cards + saved responses ---------- */
+
+.capture-card {
+  border: 1px solid #3a3c45;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #1c1d22;
+}
+
+.capture-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.capture-label {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e7e7ea;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.capture-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8d8f99;
+  border: 1px solid #3a3c45;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.capture-card textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+
+#response-filter-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+#response-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.response-item {
+  border: 1px solid #3a3c45;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #1c1d22;
+}
+
+.response-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.response-head .title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.response-meta {
+  font-size: 10px;
+  color: #8d8f99;
+  margin: 3px 0 5px;
+}
+
+.response-excerpt {
+  margin: 0 0 7px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #c3c5cd;
+  white-space: pre-wrap;
+}
+
+.response-item button,
+.capture-card button {
+  font-size: 11px;
+  padding: 5px 8px;
 }

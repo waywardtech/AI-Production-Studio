@@ -2,13 +2,13 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Far Edge Studio — Prompt Composer</title>
+  <title>Edge Studio</title>
   <link rel="stylesheet" href="sidepanel.css" />
 </head>
 <body>
   <header>
-    <h1>Far Edge Studio</h1>
-    <p class="subtitle">Prompt Composer — Phase 1 MVP</p>
+    <h1>Edge Studio</h1>
+    <p class="subtitle">Prompt Composer &amp; Response Manager</p>
   </header>
 
   <section id="palette">
@@ -44,6 +44,23 @@
     <button id="refresh-tabs-btn" class="secondary">Refresh open ChatGPT tabs</button>
     <ul id="tab-list"></ul>
     <button id="insert-btn">Insert into selected tab(s)</button>
+  </section>
+
+  <section id="capture-section">
+    <h2>Capture</h2>
+    <p class="hint">Pulls from the tabs ticked above. Capture selection
+      takes whatever you've highlighted in the page.</p>
+    <div class="row">
+      <button id="capture-latest-btn" class="secondary">Latest response</button>
+      <button id="capture-selection-btn" class="secondary">Selection</button>
+    </div>
+    <div id="capture-list"></div>
+  </section>
+
+  <section id="responses-section">
+    <h2>Saved Responses</h2>
+    <input id="response-filter-input" type="text" placeholder="Filter saved responses..." />
+    <ul id="response-list"></ul>
   </section>
 
   <div id="toast" class="toast hidden"></div>

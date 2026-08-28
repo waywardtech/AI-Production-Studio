@@ -1,14 +1,14 @@
-// Far Edge Studio — background service worker
+// Edge Studio — background service worker
 // Covers: M1-1 (extension scaffold), M1-5 (tab detection), M1-7/M1-8 (send-to-tab relay)
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Far Edge Studio] Installed.');
+  console.log('[Edge Studio] Installed.');
 });
 
 // Open the side panel when the toolbar icon is clicked.
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
-  .catch((error) => console.error('[Far Edge Studio] setPanelBehavior failed:', error));
+  .catch((error) => console.error('[Edge Studio] setPanelBehavior failed:', error));
 
 // --- M1-5: Tab detection ---
 // The side panel asks the background worker for the current list of
@@ -26,20 +26,20 @@ async function findChatGptTabs() {
   }));
 }
 
-// --- M1-7 / M1-8: Injection relay ---
+// --- M1-7 / M1-8 / M2-1: Content-script relay ---
 // The side panel is a separate extension context and can't message a
 // content script directly, so the background worker relays the request.
-async function sendInjectMessage(tabId, text) {
-  const response = await chrome.tabs.sendMessage(tabId, {
-    type: 'FAR_EDGE_INJECT_PROMPT',
-    text,
-  });
+// Everything that talks to the page — injecting a prompt, capturing a
+// response, capturing a selection — goes through relayToTab so they all
+// get the same recovery behaviour.
+async function sendToAdapter(tabId, message) {
+  const response = await chrome.tabs.sendMessage(tabId, message);
   return response ?? { success: false, reason: 'No response from content script.' };
 }
 
-async function injectIntoTab(tabId, text) {
+async function relayToTab(tabId, message) {
   try {
-    return await sendInjectMessage(tabId, text);
+    return await sendToAdapter(tabId, message);
   } catch (error) {
     // The content script isn't reachable on this tab. The usual cause is
     // a tab that was already open when the extension was installed or
@@ -55,9 +55,9 @@ async function injectIntoTab(tabId, text) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['content-scripts/chatgpt-inject.js'],
+        files: ['content-scripts/chatgpt-adapter.js'],
       });
-      return await sendInjectMessage(tabId, text);
+      return await sendToAdapter(tabId, message);
     } catch (retryError) {
       return { success: false, reason: retryError.message };
     }
@@ -65,13 +65,25 @@ async function injectIntoTab(tabId, text) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'FAR_EDGE_GET_TABS') {
+  if (message.type === 'EDGE_STUDIO_GET_TABS') {
     findChatGptTabs().then(sendResponse);
     return true; // keep the message channel open for the async response
   }
 
-  if (message.type === 'FAR_EDGE_SEND_TO_TAB') {
-    injectIntoTab(message.tabId, message.text).then(sendResponse);
+  if (message.type === 'EDGE_STUDIO_SEND_TO_TAB') {
+    relayToTab(message.tabId, {
+      type: 'EDGE_STUDIO_INJECT_PROMPT',
+      text: message.text,
+    }).then(sendResponse);
+    return true;
+  }
+
+  // --- M2-1 / M2-2: capture relays ---
+  if (
+    message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE' ||
+    message.type === 'EDGE_STUDIO_CAPTURE_SELECTION'
+  ) {
+    relayToTab(message.tabId, { type: message.type }).then(sendResponse);
     return true;
   }
 });

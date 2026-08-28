@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Far Edge Studio — Prompt Composer",
-  "short_name": "Far Edge Composer",
+  "name": "Edge Studio",
+  "short_name": "Edge Studio",
   "version": "0.3.0",
-  "description": "Block-based prompt builder with drag-and-drop composition and one-click injection into ChatGPT. Phase 1 MVP.",
+  "description": "Block-based prompt builder with drag-and-drop composition, one-click injection into ChatGPT, and response capture.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -25,7 +25,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Open Far Edge Studio",
+    "default_title": "Open Edge Studio",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -43,7 +43,7 @@
         "https://chat.openai.com/*"
       ],
       "js": [
-        "content-scripts/chatgpt-inject.js"
+        "content-scripts/chatgpt-adapter.js"
       ],
       "run_at": "document_idle"
     }

@@ -19,11 +19,21 @@ modules/
 
 ## Status
 
+The extension is named **Edge Studio**. Its directory keeps the
+`module-1-prompt-composer` name the spec and ticket docs use.
+
 **Module 1 (Prompt Composer & Injection)** — Phase 1 MVP working: block
 builder, ChatGPT tab detection/labeling, injection with clipboard
-fallback, local prompt library, and variable placeholders. See
-`modules/module-1-prompt-composer/README.md` for install steps and a
+fallback, local prompt library, and variable placeholders.
+
+**Module 2 (Response Manager & Archive)** — first three tickets working
+in the same extension: capture the latest response or a page selection
+from any tracked tab, save it with a link back to its source, and send
+it back into the builder as a block. Drive-backed export (M2-4/M2-5) and
+the reformat pipeline (M2-6) are still open.
+
+See `modules/module-1-prompt-composer/README.md` for install steps and a
 ticket-by-ticket status table.
 
-**Core (auth/Drive)**, **Module 2 (Response Manager)**, and **Module 3
-(Visual Reference Pipeline)** — spec'd and ticketed, not yet built.
+**Core (auth/Drive)** and **Module 3 (Visual Reference Pipeline)** —
+spec'd and ticketed, not yet built.
