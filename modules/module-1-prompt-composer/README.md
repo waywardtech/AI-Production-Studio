@@ -1,7 +1,7 @@
 # Far Edge Studio — Prompt Composer (Phase 1 MVP)
 
 A working Chrome extension covering the Phase 1 ticket set from
-`far-edge-studio-phase0-1-tickets.md`. Load it, use it on ChatGPT today,
+`../../docs/tickets-phase-0-2.md`. Load it, use it on ChatGPT today,
 then keep building on top of it.
 
 ## Install (unpacked, Chrome only)
@@ -9,7 +9,7 @@ then keep building on top of it.
 1. Open `chrome://extensions`
 2. Turn on **Developer mode** (top right)
 3. Click **Load unpacked**
-4. Select this `far-edge-extension` folder
+4. Select this `modules/module-1-prompt-composer` folder
 5. Click the extension's toolbar icon to open the side panel
 6. Open a `chatgpt.com` tab, click **Refresh open ChatGPT tabs** in the
    side panel, build a prompt, select the tab, and click **Insert**
