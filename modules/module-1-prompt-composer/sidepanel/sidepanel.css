@@ -658,3 +658,19 @@ button.danger {
 .modal-body {
   white-space: pre-wrap;
 }
+
+.platform-badge {
+  flex: 0 0 auto;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #2a2c33;
+  color: #a9abb4;
+  border: 1px solid #3a3c45;
+}
+
+.platform-badge[data-platform="chatgpt"] { color: #74c69d; }
+.platform-badge[data-platform="claude"]  { color: #e0a06a; }
+.platform-badge[data-platform="gemini"]  { color: #7fa6f0; }

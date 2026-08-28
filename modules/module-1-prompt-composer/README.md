@@ -171,6 +171,33 @@ the Prompts tab so you can see what landed.
 Saved replies have their own filter, which matches on title, body text
 and source tab.
 
+## Code layout
+
+The side panel is an ES module graph, one module per concern:
+
+```
+sidepanel/
+  sidepanel.js        entry — wires the modules together and starts them
+  lib/
+    state.js          shared mutable panel state
+    storage.js        every chrome.storage read/write — the CORE-4 seam
+    variables.js      <placeholder> logic — pure, no DOM, no chrome APIs
+    modal.js          the panel's one dialog
+    ui.js             toasts, Prompts/Replies switching, clipboard
+    blocks.js         block types: the palette and the Manage editor
+    builder.js        the canvas, and everything that puts text into it
+    library.js        saved prompts, tags and grouping
+    targets.js        the shared Chat tabs list
+    insert.js         Insert, the variable form, clipboard fallback
+    optimize.js       the platform-targeted rewrite loop
+    replies.js        capture, save, and reuse
+```
+
+`variables.js` is deliberately dependency-free so it can be imported and
+tested outside a browser. `storage.js` is the one place that talks to
+`chrome.storage`, which is what makes the Drive swap below a contained
+change rather than a sweep.
+
 ## What's stubbed and why (CORE-1 / CORE-4)
 
 The Phase 0 tickets call for Google OAuth login and a Drive-backed
@@ -190,9 +217,8 @@ they're scoped to this one browser profile.
    extension's ID (visible on `chrome://extensions` once loaded)
 3. Add `identity` to `manifest.json` permissions and the client ID under
    `oauth2`
-4. Swap `getLibrary()` / `saveLibrary()` and `getResponses()` /
-   `saveResponses()` in `sidepanel.js` for calls against the Drive API
-   instead of `chrome.storage.local`
+4. Rewrite `lib/storage.js` against the Drive API instead of
+   `chrome.storage.local` — nothing outside that file needs to change
 
 Everything else (blocks, tabs, injection, capture, fallback) doesn't
 need to change when that happens. Saved responses already carry the

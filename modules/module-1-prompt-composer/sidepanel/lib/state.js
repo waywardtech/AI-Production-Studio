@@ -1,0 +1,20 @@
+// Shared mutable panel state.
+//
+// One object rather than exported `let` bindings: modules need to
+// replace these wholesale (canvasBlocks after a load, detectedTabs
+// after a refresh), and an imported binding can't be reassigned from
+// outside the module that declares it.
+
+export const state = {
+  canvasBlocks: [], // { id, type, text }
+  blockTypes: [], // { id, label }
+  detectedTabs: [], // { id, title, url, windowId, platform }
+  tabLabels: {}, // { [tabId]: label }
+  selectedTabIds: new Set(),
+  captures: [], // staged, unsaved: { id, tabId, label, kind, text, url, capturedAt }
+  activeTagFilter: null, // null = all tags
+};
+
+export function newBlockId(type) {
+  return `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
