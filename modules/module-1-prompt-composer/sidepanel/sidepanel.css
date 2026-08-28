@@ -272,6 +272,22 @@ button:hover {
   font-size: 13px;
 }
 
+.modal-body {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #c3c5cd;
+}
+
+.modal-body.hidden {
+  display: none;
+}
+
+button.danger {
+  background: #c1443c;
+  color: #fff;
+}
+
 .variable-field {
   margin-bottom: 8px;
 }
@@ -281,6 +297,11 @@ button:hover {
   font-size: 11px;
   color: #a9abb4;
   margin-bottom: 3px;
+}
+
+/* Variable names are tokens, so they read better monospaced. Plain
+   labels (e.g. the save-prompt title) keep the panel's own font. */
+.variable-field.mono label {
   font-family: monospace;
 }
 

@@ -21,10 +21,12 @@ const libraryListEl = document.getElementById('library-list');
 const filterInputEl = document.getElementById('filter-input');
 const tabListEl = document.getElementById('tab-list');
 const toastEl = document.getElementById('toast');
-const variableModalEl = document.getElementById('variable-modal');
-const variableFieldsEl = document.getElementById('variable-fields');
-const variableCancelBtn = document.getElementById('variable-cancel-btn');
-const variableSubmitBtn = document.getElementById('variable-submit-btn');
+const modalEl = document.getElementById('modal');
+const modalTitleEl = document.getElementById('modal-title');
+const modalBodyEl = document.getElementById('modal-body');
+const modalFieldsEl = document.getElementById('modal-fields');
+const modalCancelBtn = document.getElementById('modal-cancel-btn');
+const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 
 // ---------- Storage helpers (M1-3 local stand-in for CORE-4) ----------
 
@@ -37,13 +39,24 @@ async function saveLibrary(library) {
   await chrome.storage.local.set({ library });
 }
 
+// Tab labels live in storage.session, not storage.local, and that's
+// deliberate. They're keyed by Chrome tab ID, and tab IDs are only
+// unique within a single browser session — Chrome hands the same IDs
+// out again after a restart. Persisting them to storage.local meant a
+// label saved against tab 42 today would reappear on an unrelated tab
+// 42 tomorrow, quietly mislabelling a destination. storage.session is
+// cleared when the browser closes, which matches M1-6's "labels persist
+// per tab session" acceptance criterion exactly and makes the ID reuse
+// unreachable. (Labels that survive a restart would need a stable key
+// such as the conversation URL — that's a feature, not this fix.)
+
 async function getTabLabels() {
-  const { tabLabels: stored } = await chrome.storage.local.get('tabLabels');
+  const { tabLabels: stored } = await chrome.storage.session.get('tabLabels');
   return stored || {};
 }
 
 async function saveTabLabels(labels) {
-  await chrome.storage.local.set({ tabLabels: labels });
+  await chrome.storage.session.set({ tabLabels: labels });
 }
 
 // ---------- Variable placeholders ----------
@@ -75,40 +88,73 @@ async function resolveVariables(text) {
 }
 
 function promptForVariables(names) {
+  return openModal({
+    title: 'Fill in variables',
+    fields: names.map((name) => ({ name, label: name, mono: true })),
+    confirmLabel: 'Insert',
+  });
+}
+
+// ---------- Generic in-panel modal ----------
+// Side panels are extension pages, where native window.prompt/confirm
+// are unreliable and visually inconsistent with the panel. Every dialog
+// — variables, the save-prompt title, the delete confirmation — goes
+// through this one function instead.
+//
+// Resolves to an object of field values keyed by field name, or null if
+// Dan cancels. A modal with no fields resolves to {} on confirm, which
+// is what makes it usable as a confirmation dialog.
+
+function openModal({ title, body = null, fields = [], confirmLabel = 'OK', danger = false }) {
   return new Promise((resolve) => {
-    variableFieldsEl.innerHTML = '';
+    modalTitleEl.textContent = title;
+
+    if (body) {
+      modalBodyEl.textContent = body;
+      modalBodyEl.classList.remove('hidden');
+    } else {
+      modalBodyEl.classList.add('hidden');
+    }
+
+    modalFieldsEl.innerHTML = '';
     const inputs = {};
 
-    names.forEach((name) => {
-      const field = document.createElement('div');
-      field.className = 'variable-field';
+    fields.forEach((field) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = field.mono ? 'variable-field mono' : 'variable-field';
 
       const label = document.createElement('label');
-      label.textContent = name;
-      field.appendChild(label);
+      label.textContent = field.label;
+      wrapper.appendChild(label);
 
       const input = document.createElement('input');
       input.type = 'text';
-      inputs[name] = input;
-      field.appendChild(input);
+      input.value = field.value || '';
+      inputs[field.name] = input;
+      wrapper.appendChild(input);
 
-      variableFieldsEl.appendChild(field);
+      modalFieldsEl.appendChild(wrapper);
     });
 
-    variableModalEl.classList.remove('hidden');
-    const firstInput = inputs[names[0]];
+    modalConfirmBtn.textContent = confirmLabel;
+    modalConfirmBtn.classList.toggle('danger', danger);
+    modalEl.classList.remove('hidden');
+
+    const firstInput = fields.length ? inputs[fields[0].name] : null;
     if (firstInput) firstInput.focus();
+    else modalConfirmBtn.focus();
 
     function cleanup() {
-      variableModalEl.classList.add('hidden');
-      variableSubmitBtn.removeEventListener('click', onSubmit);
-      variableCancelBtn.removeEventListener('click', onCancel);
+      modalEl.classList.add('hidden');
+      modalConfirmBtn.removeEventListener('click', onConfirm);
+      modalCancelBtn.removeEventListener('click', onCancel);
+      modalEl.removeEventListener('keydown', onKeydown);
     }
 
-    function onSubmit() {
+    function onConfirm() {
       const values = {};
-      names.forEach((name) => {
-        values[name] = inputs[name].value;
+      fields.forEach((field) => {
+        values[field.name] = inputs[field.name].value;
       });
       cleanup();
       resolve(values);
@@ -119,8 +165,16 @@ function promptForVariables(names) {
       resolve(null);
     }
 
-    variableSubmitBtn.addEventListener('click', onSubmit);
-    variableCancelBtn.addEventListener('click', onCancel);
+    function onKeydown(e) {
+      if (e.key === 'Escape') onCancel();
+      // Enter submits from any single-line input, but not from the
+      // buttons themselves (they handle their own click).
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT') onConfirm();
+    }
+
+    modalConfirmBtn.addEventListener('click', onConfirm);
+    modalCancelBtn.addEventListener('click', onCancel);
+    modalEl.addEventListener('keydown', onKeydown);
   });
 }
 
@@ -241,8 +295,18 @@ document.getElementById('save-prompt-btn').addEventListener('click', async () =>
     showToast('Nothing to save — add a block first.', 'warning');
     return;
   }
-  const title = prompt('Name this prompt:');
-  if (!title) return;
+  const result = await openModal({
+    title: 'Save prompt',
+    fields: [{ name: 'title', label: 'Name this prompt' }],
+    confirmLabel: 'Save',
+  });
+  if (result === null) return;
+
+  const title = result.title.trim();
+  if (!title) {
+    showToast('Give the prompt a name to save it.', 'warning');
+    return;
+  }
 
   const library = await getLibrary();
   library.unshift({
@@ -254,7 +318,7 @@ document.getElementById('save-prompt-btn').addEventListener('click', async () =>
   });
   await saveLibrary(library);
   showToast(`Saved "${title}" to your library.`);
-  renderLibrary();
+  renderLibrary(filterInputEl.value);
 });
 
 async function renderLibrary(filterText = '') {
@@ -303,8 +367,19 @@ async function renderLibrary(filterText = '') {
     del.textContent = '✕';
     del.title = 'Delete';
     del.addEventListener('click', async () => {
+      // The library is the only copy of a saved prompt until CORE-4
+      // backs it with Drive, so a stray click here is unrecoverable.
+      const confirmed = await openModal({
+        title: 'Delete prompt',
+        body: `Delete "${item.title}"? This can't be undone.`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
+      if (confirmed === null) return;
+
       const lib = await getLibrary();
       await saveLibrary(lib.filter((x) => x.id !== item.id));
+      showToast(`Deleted "${item.title}".`);
       renderLibrary(filterInputEl.value);
     });
     li.appendChild(del);
@@ -320,6 +395,29 @@ filterInputEl.addEventListener('input', (e) => renderLibrary(e.target.value));
 async function refreshTabs() {
   detectedTabs = await chrome.runtime.sendMessage({ type: 'FAR_EDGE_GET_TABS' });
   tabLabels = await getTabLabels();
+
+  // Drop anything referring to a tab that no longer exists. Without
+  // this, closing a selected tab left its ID in selectedTabIds with no
+  // row in the list to unselect — Insert would then try to reach a dead
+  // tab and report a failure for something Dan couldn't see. Labels get
+  // the same treatment so the map doesn't grow for the whole session.
+  const liveTabIds = new Set(detectedTabs.map((tab) => tab.id));
+
+  for (const tabId of selectedTabIds) {
+    if (!liveTabIds.has(tabId)) selectedTabIds.delete(tabId);
+  }
+
+  const liveLabels = {};
+  let droppedLabel = false;
+  for (const [tabId, label] of Object.entries(tabLabels)) {
+    if (liveTabIds.has(Number(tabId))) liveLabels[tabId] = label;
+    else droppedLabel = true;
+  }
+  if (droppedLabel) {
+    tabLabels = liveLabels;
+    await saveTabLabels(tabLabels);
+  }
+
   renderTabList();
 }
 

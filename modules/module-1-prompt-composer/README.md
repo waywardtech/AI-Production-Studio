@@ -23,7 +23,7 @@ then keep building on top of it.
 | M1-3 Prompt library (save/load) | ⚠️ Partial | Saves to `chrome.storage.local`, not Drive — see "What's stubbed" below |
 | M1-4 Filter + flat list | ✅ | Single filter box over a flat library list |
 | M1-5 ChatGPT tab detection | ✅ | Background worker queries open `chatgpt.com` / `chat.openai.com` tabs |
-| M1-6 Manual tab labeling | ✅ | Editable label per tab, persisted locally |
+| M1-6 Manual tab labeling | ✅ | Editable label per tab, scoped to the browser session |
 | M1-7 Destination picker | ✅ | Checkbox list, multi-tab select supported |
 | M1-8 ChatGPT injection engine | ✅ | Multi-strategy (contenteditable + textarea), see caveat below |
 | M1-9 Clipboard fallback | ✅ | Auto-triggers on injection failure with a clear toast |
@@ -68,6 +68,26 @@ this one browser profile.
 
 Everything else (blocks, tabs, injection, fallback) doesn't need to
 change when that happens.
+
+## Tab labels are per browser session
+
+Labels are keyed by Chrome's tab ID and stored in `chrome.storage.session`,
+so they're cleared when the browser closes. That's deliberate: tab IDs
+are only unique within a session and Chrome reissues them after a
+restart, so a label persisted to disk would eventually reattach itself
+to an unrelated tab. Labels that survive a restart need a stable key
+(the conversation URL) — that's a change worth its own ticket, not a
+silent behaviour.
+
+## Tabs opened before the extension loaded
+
+Manifest content scripts only run on navigation, so a ChatGPT tab that
+was already open when the extension was installed or reloaded has no
+content script and can't be injected into. The background worker now
+detects that case and injects `chatgpt-inject.js` programmatically via
+`chrome.scripting`, then retries — no reload needed. The M1-9 clipboard
+fallback still covers the cases that can't be recovered (tab
+mid-navigation, or a URL outside the extension's host permissions).
 
 ## Known caveat: ChatGPT's DOM will change
 

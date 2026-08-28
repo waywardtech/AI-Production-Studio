@@ -2,9 +2,21 @@
   "manifest_version": 3,
   "name": "Far Edge Studio — Prompt Composer",
   "short_name": "Far Edge Composer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Block-based prompt builder with drag-and-drop composition and one-click injection into ChatGPT. Phase 1 MVP.",
-  "permissions": ["storage", "tabs", "scripting", "clipboardWrite", "sidePanel"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "clipboardWrite",
+    "sidePanel"
+  ],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*"
@@ -13,15 +25,26 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Open Far Edge Studio"
+    "default_title": "Open Far Edge Studio",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
-      "js": ["content-scripts/chatgpt-inject.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "content-scripts/chatgpt-inject.js"
+      ],
       "run_at": "document_idle"
     }
   ]

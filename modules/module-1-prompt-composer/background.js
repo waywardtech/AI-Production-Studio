@@ -29,20 +29,38 @@ async function findChatGptTabs() {
 // --- M1-7 / M1-8: Injection relay ---
 // The side panel is a separate extension context and can't message a
 // content script directly, so the background worker relays the request.
+async function sendInjectMessage(tabId, text) {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: 'FAR_EDGE_INJECT_PROMPT',
+    text,
+  });
+  return response ?? { success: false, reason: 'No response from content script.' };
+}
+
 async function injectIntoTab(tabId, text) {
   try {
-    const response = await chrome.tabs.sendMessage(tabId, {
-      type: 'FAR_EDGE_INJECT_PROMPT',
-      text,
-    });
-    return response ?? { success: false, reason: 'No response from content script.' };
+    return await sendInjectMessage(tabId, text);
   } catch (error) {
-    // Content script isn't reachable on this tab — e.g. the tab hasn't
-    // finished loading, or was opened before the extension was
-    // installed. This is exactly the case the M1-9 clipboard fallback
-    // exists to handle; we surface the failure and let the side panel
-    // decide to fall back.
-    return { success: false, reason: error.message };
+    // The content script isn't reachable on this tab. The usual cause is
+    // a tab that was already open when the extension was installed or
+    // reloaded: manifest content scripts only run on navigation, so
+    // those tabs never got one.
+    //
+    // That's recoverable without asking Dan to reload anything — inject
+    // the script programmatically, then retry the message. This is what
+    // the "scripting" permission is for; only if this also fails do we
+    // report failure and let the side panel use the M1-9 clipboard
+    // fallback (genuine cases: the tab is on a URL we have no host
+    // permission for, or it's mid-navigation).
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content-scripts/chatgpt-inject.js'],
+      });
+      return await sendInjectMessage(tabId, text);
+    } catch (retryError) {
+      return { success: false, reason: retryError.message };
+    }
   }
 }
 

@@ -66,8 +66,17 @@ function injectPrompt(text) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'FAR_EDGE_INJECT_PROMPT') {
-    sendResponse(injectPrompt(message.text));
-  }
-});
+// The background worker may inject this file programmatically into a tab
+// that was already open before the extension loaded. If the manifest
+// content script did run after all, that would register a second
+// listener on the same page and both would answer the same message, so
+// guard against registering twice.
+if (!window.__farEdgeInjectListenerRegistered) {
+  window.__farEdgeInjectListenerRegistered = true;
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'FAR_EDGE_INJECT_PROMPT') {
+      sendResponse(injectPrompt(message.text));
+    }
+  });
+}

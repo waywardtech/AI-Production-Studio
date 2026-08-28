@@ -48,13 +48,18 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <div id="variable-modal" class="modal-overlay hidden">
-    <div class="modal-box">
-      <h3>Fill in variables</h3>
-      <div id="variable-fields"></div>
+  <!-- One generic modal serves the variable prompt, the save-prompt
+       title input, and the delete confirmation. Extension side panels
+       can't rely on native window.prompt/confirm, so every dialog in
+       the panel runs through here. -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-body" class="modal-body hidden"></p>
+      <div id="modal-fields"></div>
       <div class="row">
-        <button id="variable-cancel-btn" class="secondary">Cancel</button>
-        <button id="variable-submit-btn">Insert</button>
+        <button id="modal-cancel-btn" class="secondary">Cancel</button>
+        <button id="modal-confirm-btn">OK</button>
       </div>
     </div>
   </div>
