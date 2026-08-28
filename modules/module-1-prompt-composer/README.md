@@ -20,8 +20,9 @@ docs refer to this module.
 3. Click **Load unpacked**
 4. Select this `modules/module-1-prompt-composer` folder
 5. Click the extension's toolbar icon to open the side panel
-6. Open a `chatgpt.com` tab, click **Refresh** under Chat tabs, tick
-   the tab, build a prompt on the **Prompts** tab, and click **Insert**
+6. Open a ChatGPT, Claude or Gemini tab, click **Refresh** under Chat
+   tabs, tick the tab, build a prompt on the **Prompts** tab, and click
+   **Insert**
 7. To pull work back out, switch to **Replies** and use **Latest
    response** (or highlight text in the page and use **Selection**)
 
@@ -33,21 +34,24 @@ docs refer to this module.
 | M1-2 Block builder UI | ✅ | Drag Scenario / Expertise / Ask into the canvas, edit inline |
 | M1-3 Prompt library (save/load) | ⚠️ Partial | Saves to `chrome.storage.local`, not Drive — see "What's stubbed" below |
 | M1-4 Filter + flat list | ✅ | Single filter box over a flat library list |
-| M1-5 ChatGPT tab detection | ✅ | Background worker queries open `chatgpt.com` / `chat.openai.com` tabs |
+| M1-5 Chat tab detection | ✅ | Background worker queries open ChatGPT, Claude and Gemini tabs |
 | M1-6 Manual tab labeling | ✅ | Editable label per tab, scoped to the browser session |
 | M1-7 Destination picker | ✅ | Checkbox list, multi-tab select supported |
-| M1-8 ChatGPT injection engine | ✅ | Multi-strategy (contenteditable + textarea), see caveat below |
+| M1-8 Injection engine | ✅ | Multi-strategy (contenteditable + textarea) across all three platforms, see caveat below |
 | M1-9 Clipboard fallback | ✅ | Auto-triggers on injection failure with a clear toast |
 | M1-10 Usage scrape (stretch) | ❌ Not started | Deferred — flagged as stretch/1.5 in the ticket doc |
 | M1-11 Variable placeholders | ✅ | See below |
 | M1.5-1 Format block | ✅ | Ships as a default block type; block types are editable — see below |
 | M1.5-2 Optimize step | ✅ | Runs in a chat you already have open, no bundled API call — see below |
 | M1.5-3 Optimize result intake | ✅ | Scraped reply is shown for approve / edit / copy before it touches the builder |
-| M1.5-4/5/6/7 Claude + Gemini | ❌ Not started | Optimization can *target* them; injecting into them needs their DOM adapters |
-| M2-1 Response capture panel | ✅ | Captures the latest response, or the page selection, per ticked tab |
+| M1.5-4 Claude injection | ✅ | Shared page adapter, ProseMirror composer |
+| M1.5-5 Gemini injection | ✅ | Shared page adapter, Quill (`rich-textarea`) composer |
+| M1.5-6 Claude + Gemini detection | ✅ | Chat tabs lists all three, badged by platform |
+| M1.5-7 Multi-platform destination | ✅ | Tick tabs across platforms and Insert reaches all of them |
+| M2-1 Reply capture panel | ✅ | Captures the latest reply, or the page selection, per ticked tab, on all three platforms |
 | M2-2 Select & save | ✅ | Staged captures are editable before saving, which is also how "save just this section" works |
 | M2-3 Send to prompt | ✅ | Drops a capture or saved response into the builder as a Scenario block |
-| M2-4 Gemini native save | ❌ Not started | Needs Gemini support (Phase 1.5) first |
+| M2-4 Gemini native save | ❌ Not started | Unblocked now Gemini is supported; still to build |
 | M2-5 Export-to-Drive fallback | ❌ Not started | Blocked on CORE-1/CORE-4, same as M1-3 |
 | M2-6 Reformat pipeline | ❌ Not started | P1 |
 | M2-7 Alternate export formats | ⚠️ Partial | **Copy MD** puts a saved response on the clipboard as Markdown; writing real files waits on Drive |
@@ -239,28 +243,38 @@ silent behaviour.
 Manifest content scripts only run on navigation, so a ChatGPT tab that
 was already open when the extension was installed or reloaded has no
 content script and can't be injected into. The background worker now
-detects that case and injects `chatgpt-adapter.js` programmatically via
+detects that case and injects `chat-adapter.js` programmatically via
 `chrome.scripting`, then retries — no reload needed. The M1-9 clipboard
 fallback still covers the cases that can't be recovered (tab
 mid-navigation, or a URL outside the extension's host permissions).
 
-## Known caveat: ChatGPT's DOM will change
+## Known caveat: these sites will change their markup
 
-`content-scripts/chatgpt-adapter.js` is the only file that touches
-ChatGPT's markup, and it's the accepted screen-scraping tradeoff
-documented in the spec (§7). Two functions are where a ChatGPT redesign
-lands:
+`content-scripts/chat-adapter.js` is the only file that touches any
+chat platform's markup, and it's the accepted screen-scraping tradeoff
+documented in the spec (§7). One adapter serves all three platforms —
+the plumbing and insertion strategies are identical and only the
+selectors differ, so those live in a single `PLATFORMS` table at the
+top of the file. That table is where a redesign lands.
 
-- `findChatGptInput()` — writing. Looks for `#prompt-textarea` or a
-  `contenteditable` div, falling back to a plain `textarea`.
-- `findAssistantTurns()` — reading. Looks for
-  `[data-message-author-role="assistant"]`, falling back to
-  `article[data-testid^="conversation-turn-"]` minus the user's turns.
+Each platform lists selectors most-specific first and falls back to
+generic structure, so a renamed test id degrades to "still works via
+the contenteditable fallback" rather than breaking outright:
+
+| Platform | Composer | Replies |
+|---|---|---|
+| ChatGPT | `#prompt-textarea` → contenteditable → textarea | `[data-message-author-role="assistant"]` → conversation turns minus the user's |
+| Claude | `.ProseMirror` contenteditable → contenteditable → textarea | `[data-testid="assistant-message"]` → `.font-claude-message` → `[data-is-streaming]` |
+| Gemini | `rich-textarea .ql-editor` → `.ql-editor` → contenteditable → textarea | `model-response` → `message-content.model-response-text` → `.model-response-text` |
+
+The Claude and Gemini selectors are best-effort and unverified against
+the live sites — if capture comes back empty on one of them, that table
+is the one thing to fix.
 
 ## Next up
 
-Per the ticket doc: the Claude and Gemini injection adapters
-(M1.5-4/5/6/7) — optimization can already *target* those platforms, but
-inserting into them needs their own DOM adapters and host permissions.
-Then the rest of Phase 2 — M2-4/M2-5 (Drive-backed export, blocked on
-CORE-1/CORE-4) and M2-6 (reformat pipeline).
+Phases 1 and 1.5 are complete. What's left is blocked on Phase 0 or
+still open in Phase 2: CORE-1/CORE-4 (Google auth and the Drive-backed
+repository, which everything currently stubbed to local storage is
+waiting on), M2-4/M2-5 (export to Drive), M2-6 (reformat pipeline), and
+CORE-8/M1-10 (the Usage tab and its scrapers).

@@ -111,21 +111,25 @@ Bring the optimized result back into the tool; Dan can approve as-is, edit inlin
 *Depends on:* M1.5-2
 *Built as:* Polls the worker tab and waits for the answer to stop streaming before scraping, then strips the code fence and any preamble. The result is shown in an editable box with Copy and Replace builder. Re-running Optimize is the regeneration pass.
 
-**M1.5-4 — Claude injection adapter**
+**M1.5-4 — Claude injection adapter** ✅ *Implemented*
 Extend the injection engine (M1-8) with a DOM adapter for claude.ai's input field.
 *Acceptance:* Approved prompt inserts correctly into an open Claude tab.
+*Built as:* Shared `chat-adapter.js` handles all three platforms from one PLATFORMS table; Claude's ProseMirror composer uses the same contenteditable strategy as ChatGPT.
 
-**M1.5-5 — Gemini injection adapter**
+**M1.5-5 — Gemini injection adapter** ✅ *Implemented*
 Extend the injection engine with a DOM adapter for Gemini's contenteditable/rich-textarea input, informed by the `Ask-Gemini-Extension` reference project's multi-strategy approach.
 *Acceptance:* Approved prompt inserts correctly into an open Gemini tab.
+*Built as:* Same shared adapter; Gemini's Quill editor is reached via `rich-textarea .ql-editor` with contenteditable fallbacks.
 
-**M1.5-6 — Claude + Gemini tab detection & labeling**
+**M1.5-6 — Claude + Gemini tab detection & labeling** ✅ *Implemented*
 Extend M1-5/M1-6 detection and manual labeling to claude.ai and gemini.google.com.
 *Acceptance:* Claude/Gemini tabs appear in the destination picker alongside ChatGPT tabs.
+*Built as:* The background worker queries all three platforms and tags each tab with its platform; the panel badges them and labels them the same way.
 
-**M1.5-7 — Multi-platform destination picker**
+**M1.5-7 — Multi-platform destination picker** ✅ *Implemented*
 Update the destination picker (M1-7) to support selecting targets across all three platforms in a single send.
 *Depends on:* M1.5-4, M1.5-5, M1.5-6
+*Built as:* The Chat tabs list is platform-agnostic — tick tabs across platforms and Insert reaches all of them in one send.
 
 **M1.5-8 — Claude + Gemini usage scrape (P1)**
 Extend usage tracking (CORE-8/M1-10) to scrape Claude's and Gemini's own usage indicators.
@@ -134,11 +138,11 @@ Extend usage tracking (CORE-8/M1-10) to scrape Claude's and Gemini's own usage i
 
 ## Epic: Phase 2 — Module 2: Response Manager & Archive
 
-**M2-1 — Response capture panel** ✅ *Implemented (ChatGPT only)*
+**M2-1 — Response capture panel** ✅ *Implemented (all three platforms)*
 Surface the latest response from each tracked, open tab in a dedicated panel.
 *Depends on:* M1.5-6 for full 3-platform coverage (can ship ChatGPT-only first and extend)
 *Acceptance:* Panel shows current response text per open, labeled tab.
-*Built as:* Capture section in the side panel, pulling from the ticked destination tabs. Captures either the latest assistant message or the current page selection.
+*Built as:* Capture section on the Replies tab, pulling from the ticked Chat tabs. Captures either the latest assistant message or the current page selection. Reading uses the same shared page adapter as injection, so it covers ChatGPT, Claude and Gemini.
 
 **M2-2 — Select & save (full response or selection)** ✅ *Implemented (local storage)*
 Let Dan select all or part of a response and save it to the repository, tagged and linked to its source tab/project.

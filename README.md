@@ -25,16 +25,16 @@ The extension is named **Edge Studio**. Its directory keeps the
 The panel has two tabs, **Prompts** and **Replies**, over a shared list
 of open chat tabs.
 
-**Module 1 (Prompt Composer & Injection)** — Phases 1 and 1.5 working
-apart from the Claude/Gemini injection adapters: block builder with
-editable block types, ChatGPT tab detection/labeling, injection with
-clipboard fallback, variable placeholders, a tagged and grouped prompt
-library, and a platform-targeted **Optimize** step that runs in a chat
-you already have open and scrapes the rewrite back for review.
+**Module 1 (Prompt Composer & Injection)** — Phases 1 and 1.5 complete:
+block builder with editable block types, tab detection/labeling and
+injection across **ChatGPT, Claude and Gemini** with clipboard fallback,
+variable placeholders, a tagged and grouped prompt library, and a
+platform-targeted **Optimize** step that runs in a chat you already have
+open and scrapes the rewrite back for review.
 
 **Module 2 (Response Manager & Archive)** — first three tickets working
 in the same extension: capture the latest reply or a page selection from
-any tracked tab, save it with a link back to its source, and turn all or
+any tracked tab on any of the three platforms, save it with a link back to its source, and turn all or
 part of it into a new prompt. Drive-backed export (M2-4/M2-5) and the
 reformat pipeline (M2-6) are still open.
 

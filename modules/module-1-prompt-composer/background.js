@@ -1,5 +1,6 @@
 // Edge Studio — background service worker
-// Covers: M1-1 (extension scaffold), M1-5 (tab detection), M1-7/M1-8 (send-to-tab relay)
+// Covers: M1-1 (extension scaffold), M1-5/M1.5-6 (tab detection across
+// ChatGPT, Claude and Gemini), M1-7/M1-8 (send-to-tab relay)
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Edge Studio] Installed.');
@@ -10,20 +11,34 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error('[Edge Studio] setPanelBehavior failed:', error));
 
-// --- M1-5: Tab detection ---
+// --- M1-5 / M1.5-6: Tab detection ---
 // The side panel asks the background worker for the current list of
-// open ChatGPT tabs, since only the background worker has the "tabs"
-// permission context needed to query across windows.
-async function findChatGptTabs() {
-  const tabs = await chrome.tabs.query({
-    url: ['https://chatgpt.com/*', 'https://chat.openai.com/*'],
-  });
-  return tabs.map((tab) => ({
-    id: tab.id,
-    title: tab.title,
-    url: tab.url,
-    windowId: tab.windowId,
-  }));
+// open chat tabs, since only the background worker has the "tabs"
+// permission context needed to query across windows. Each tab carries
+// its platform so the panel can badge it and so Optimize can default
+// its target to whatever the worker tab already is.
+const CHAT_PLATFORMS = [
+  { platform: 'chatgpt', label: 'ChatGPT', urls: ['https://chatgpt.com/*', 'https://chat.openai.com/*'] },
+  { platform: 'claude', label: 'Claude', urls: ['https://claude.ai/*'] },
+  { platform: 'gemini', label: 'Gemini', urls: ['https://gemini.google.com/*'] },
+];
+
+async function findChatTabs() {
+  const found = [];
+  for (const entry of CHAT_PLATFORMS) {
+    const tabs = await chrome.tabs.query({ url: entry.urls });
+    tabs.forEach((tab) =>
+      found.push({
+        id: tab.id,
+        title: tab.title,
+        url: tab.url,
+        windowId: tab.windowId,
+        platform: entry.platform,
+        platformLabel: entry.label,
+      })
+    );
+  }
+  return found;
 }
 
 // --- M1-7 / M1-8 / M2-1: Content-script relay ---
@@ -55,7 +70,7 @@ async function relayToTab(tabId, message) {
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
-        files: ['content-scripts/chatgpt-adapter.js'],
+        files: ['content-scripts/chat-adapter.js'],
       });
       return await sendToAdapter(tabId, message);
     } catch (retryError) {
@@ -66,7 +81,7 @@ async function relayToTab(tabId, message) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'EDGE_STUDIO_GET_TABS') {
-    findChatGptTabs().then(sendResponse);
+    findChatTabs().then(sendResponse);
     return true; // keep the message channel open for the async response
   }
 
