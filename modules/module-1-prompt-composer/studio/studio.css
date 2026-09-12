@@ -1,0 +1,734 @@
+/* Module 4 — the production workspace.
+ *
+ * The side panel's stylesheet comes first so buttons, inputs, chips,
+ * the modal and the toast look identical in both surfaces; everything
+ * below is the wide, three-column layout the panel never needed. */
+
+@import url("../sidepanel/sidepanel.css");
+
+body.studio {
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- header ---------- */
+
+.studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #2b2d34;
+  background: #1c1d22;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.brand .subtitle {
+  margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.control span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6f7178;
+}
+
+.control select {
+  background: #14151a;
+  border: 1px solid #3a3c45;
+  border-radius: 6px;
+  color: #e7e7ea;
+  font-size: 12px;
+  padding: 5px 8px;
+  min-width: 150px;
+}
+
+button.compact {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
+.pill {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  margin-left: 4px;
+  border-radius: 8px;
+  background: #3a3c45;
+  font-size: 10px;
+}
+
+/* ---------- workspace ---------- */
+
+.workspace {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 200px repeat(3, minmax(260px, 1fr));
+  gap: 1px;
+  background: #2b2d34;
+  min-height: 0;
+}
+
+#scene-rail,
+.column {
+  background: #17181c;
+  padding: 10px 12px 16px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.column h2,
+#scene-rail h2 {
+  margin-top: 12px;
+}
+
+.column .section-head:first-child h2,
+#scene-rail .section-head:first-child h2 {
+  margin-top: 0;
+}
+
+.col-note {
+  font-size: 10px;
+  color: #6f7178;
+  white-space: nowrap;
+}
+
+.field-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8d8f99;
+  margin: 8px 0 3px;
+}
+
+/* Narrower than the layout wants: the columns stack rather than
+   squeeze, so the workspace stays usable in half a screen. */
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 180px 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- scene rail ---------- */
+
+.scene-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scene-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  background: #1c1d22;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scene-item:hover {
+  border-color: #3a3c45;
+}
+
+.scene-item.active {
+  border-color: #4d6bff;
+  background: #1f2130;
+}
+
+.scene-item.dragging {
+  opacity: 0.4;
+}
+
+.scene-number {
+  font-size: 10px;
+  color: #6f7178;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-progress {
+  font-size: 10px;
+  color: #8d8f99;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-renders {
+  font-size: 10px;
+  color: #7fd68f;
+}
+
+.sequence {
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: #1c1d22;
+}
+
+.sequence-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.sequence-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sequence-count {
+  font-size: 10px;
+  color: #6f7178;
+}
+
+.sequence-scene {
+  display: block;
+  text-align: left;
+  font-size: 11px;
+  color: #8d8f99;
+  padding: 2px 0 0 8px;
+}
+
+.sequence-picker {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.sequence-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.rail-footer {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ---------- column 1: assets ---------- */
+
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.asset-tile {
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  background: #1c1d22;
+  padding: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.asset-tile:hover {
+  border-color: #3a3c45;
+}
+
+.asset-tile.attached {
+  border-color: #4d6bff;
+  background: #1f2130;
+}
+
+.asset-tile.still {
+  border-color: #7fd68f;
+}
+
+.asset-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #14151a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-glyph {
+  font-size: 22px;
+  color: #3a3c45;
+  font-weight: 600;
+}
+
+.asset-tick {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 12px;
+  color: #7fa8ff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.still-badge {
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #7fd68f;
+}
+
+.asset-name {
+  font-size: 11px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6f7178;
+}
+
+.asset-edit {
+  font-size: 11px;
+}
+
+#asset-search {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+/* ---------- column 2: running order ---------- */
+
+#scene-seed {
+  width: 100%;
+  background: #14151a;
+  border: 1px solid #3a3c45;
+  border-radius: 6px;
+  color: #e7e7ea;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.block-card {
+  background: #1c1d22;
+  border: 1px solid #2b2d34;
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.block-card.selected {
+  border-color: #4d6bff;
+}
+
+.block-card.dragging {
+  opacity: 0.4;
+}
+
+.block-card.blank {
+  border-style: dashed;
+}
+
+.block-card[data-block-type="location"] { border-left-color: #7fa8ff; }
+.block-card[data-block-type="setting"] { border-left-color: #6fc0d6; }
+.block-card[data-block-type="scene"] { border-left-color: #7fd68f; }
+.block-card[data-block-type="set-dressing"] { border-left-color: #f2b56b; }
+.block-card[data-block-type="characters"] { border-left-color: #cf8bf2; }
+.block-card[data-block-type="wardrobe"] { border-left-color: #e0a06a; }
+.block-card[data-block-type="dialogue"] { border-left-color: #f28b8b; }
+.block-card[data-block-type="camera"] { border-left-color: #9aa3b8; }
+.block-card[data-block-type="sound"] { border-left-color: #b8c46f; }
+.block-card[data-block-type="transition"] { border-left-color: #6f7178; }
+
+.block-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: #4d5058;
+  font-size: 12px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.block-card .block-type-select {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #a9abb4;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0;
+}
+
+.blank-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c98a3a;
+  border: 1px solid #4a3a22;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.block-card textarea {
+  width: 100%;
+  min-height: 46px;
+  resize: vertical;
+  background: transparent;
+  border: none;
+  color: #e7e7ea;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 0;
+  outline: none;
+}
+
+/* ---------- column 3: shot builder ---------- */
+
+.still-slot {
+  border: 1px solid #2b2d34;
+  border-radius: 8px;
+  background: #1c1d22;
+  padding: 6px;
+  margin-bottom: 4px;
+}
+
+.still-slot img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.still-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #a9abb4;
+  margin-top: 5px;
+}
+
+.aspect-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.aspect-row .field-label {
+  margin-bottom: 2px;
+}
+
+.aspect-row input {
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+}
+
+.aspect-row.blank input {
+  border-style: dashed;
+  border-color: #33353d;
+}
+
+.refine-row {
+  display: flex;
+  gap: 6px;
+}
+
+.refine-row input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+}
+
+.refine-log {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.refine-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #8d8f99;
+  border-left: 2px solid #2b2d34;
+  padding-left: 6px;
+}
+
+.refine-meta {
+  flex: 0 0 auto;
+  color: #5f616a;
+}
+
+.prompt-preview {
+  border: 1px solid #2b2d34;
+  border-radius: 8px;
+  background: #14151a;
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.preview-segment {
+  padding: 3px 5px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+}
+
+.preview-segment.highlight {
+  background: #1f2130;
+  outline: 1px solid #4d6bff;
+}
+
+.preview-label {
+  color: #7fa8ff;
+  margin-right: 5px;
+}
+
+.preview-text {
+  color: #c9cad0;
+  white-space: pre-wrap;
+}
+
+.preview-footer {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2b2d34;
+  font-size: 10px;
+  color: #5f616a;
+}
+
+/* ---------- in-box / out-box ---------- */
+
+.drawer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  width: min(560px, 100vw);
+  background: #1c1d22;
+  border-left: 1px solid #3a3c45;
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.45);
+  padding: 14px 16px;
+  overflow-y: auto;
+  z-index: 40;
+}
+
+.drawer.hidden {
+  display: none;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.drawer-head h2 {
+  margin: 0;
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.box-row {
+  border: 1px solid #2b2d34;
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: #17181c;
+  padding: 8px 10px;
+}
+
+.box-row.verdict-keep { border-left-color: #3f8f5e; }
+.box-row.verdict-reject { border-left-color: #c1443c; }
+.box-row.verdict-regen { border-left-color: #c98a3a; }
+.box-row.verdict-pending { border-left-color: #3a3c45; }
+.box-row.report { border-left-color: #7fa8ff; }
+
+.box-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.box-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.box-meta {
+  font-size: 10px;
+  color: #6f7178;
+}
+
+.verdict-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #a9abb4;
+  border: 1px solid #3a3c45;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.box-preview {
+  font-size: 11px;
+  color: #8d8f99;
+  line-height: 1.45;
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
+
+.box-link {
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 11px;
+}
+
+/* ---------- drop overlay ---------- */
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 24, 28, 0.82);
+  border: 2px dashed #4d6bff;
+  font-size: 15px;
+  color: #c9cad0;
+  pointer-events: none;
+}
+
+.drop-overlay.hidden {
+  display: none;
+}
+
+/* The modal is shared with the side panel, where it sits in a 320px
+   column. Here there's room for a real dialog. */
+body.studio .modal-box {
+  max-width: 560px;
+}
+
+body.studio .toast {
+  left: auto;
+  right: 16px;
+  max-width: 420px;
+}

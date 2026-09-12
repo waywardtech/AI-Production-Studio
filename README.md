@@ -3,18 +3,19 @@
 A modular toolset for The Far Edge studio: a shared core (Google auth,
 Drive-backed repository) with independent modules on top — prompt
 composition and injection across AI chat platforms, response
-management/archiving, and a visual reference pipeline for production
-work like the **V.O.** project.
+management/archiving, a visual reference pipeline, and a video & media
+production pipeline for work like the **V.O.** project.
 
 ## Layout
 
 ```
 docs/
-  far-edge-studio-productivity-suite-spec.md   — Full product spec (Core + 3 modules)
+  far-edge-studio-productivity-suite-spec.md   — Full product spec (Core + 4 modules)
   tickets-phase-0-2.md                          — Engineering tickets, Phases 0–2
+  tickets-phase-4.md                            — Engineering tickets, Phase 4 (Module 4)
 
 modules/
-  module-1-prompt-composer/                     — Chrome extension (Phase 1 MVP, in progress)
+  module-1-prompt-composer/                     — Chrome extension (Modules 1, 2 and 4)
 ```
 
 ## Status
@@ -23,7 +24,8 @@ The extension is named **Edge Studio**. Its directory keeps the
 `module-1-prompt-composer` name the spec and ticket docs use.
 
 The panel has three tabs — **Prompts**, **Replies** and **Usage** — over
-a shared list of open chat tabs.
+a shared list of open chat tabs, and **Production ↗** opens the Module 4
+workspace in a full window.
 
 **Module 1 (Prompt Composer & Injection)** — Phases 1 and 1.5 complete:
 block builder with editable block types, tab detection/labeling and
@@ -47,5 +49,21 @@ estimate in the composer. Reading figures off the chat pages is
 best-effort; manual entry is the reliable path, for the reasons the
 module README sets out.
 
-**Core (auth/Drive)** and **Module 3 (Visual Reference Pipeline)** —
-spec'd and ticketed, not yet built.
+**Module 4 (Video & Media Production Pipeline)** — built, end to end on
+local storage. A full-window workspace with a scene rail and three
+columns: an asset pool, the running order of blocks that make up a
+scene, and a shot builder. Start a scene from a one-line seed and each
+pass fills in the blanks without touching what you've written; refine in
+plain language; duplicate scenes, bundle them into sequences, or build a
+whole shot list out of a script. Prompts are shaped for **Sora** and
+**Veo** with job profiles for recurring work, handed to the generator's
+tab, and recorded in an out-box with keep / reject / regenerate and a
+Markdown dailies report.
+
+**Core (auth/Drive)** — spec'd and ticketed, not yet built. It is what
+the prompt library, saved replies and productions are all waiting on to
+move off local storage.
+
+**Module 3 (Visual Reference Pipeline)** — spec'd, not yet ticketed or
+built. Module 4 doesn't wait on it: it takes stills from wherever they
+come from.

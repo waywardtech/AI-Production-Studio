@@ -1,13 +1,19 @@
 # Edge Studio
 
 A working Chrome extension covering the Phase 1 and Phase 1.5 ticket
-sets and the first three Phase 2 tickets from
-`../../docs/tickets-phase-0-2.md`. Load it, use it on ChatGPT today,
+sets, the first three Phase 2 tickets from
+`../../docs/tickets-phase-0-2.md`, and Phase 4's production pipeline
+from `../../docs/tickets-phase-4.md`. Load it, use it on ChatGPT today,
 then keep building on top of it.
 
-The panel has two tabs — **Prompts** (build, save, tag, insert,
-optimize) and **Replies** (capture, save, reuse) — over a shared
-**Chat tabs** list, since both act on the same ticked tabs.
+The panel has three tabs — **Prompts** (build, save, tag, insert,
+optimize), **Replies** (capture, save, reuse) and **Usage** — over a
+shared **Chat tabs** list, since both act on the same ticked tabs.
+
+**Production ↗** in the panel header opens the Module 4 workspace: a
+full window with a scene rail and the three columns — assets, running
+order, shot builder — that compose clip prompts for Sora and Veo. See
+[The production workspace](#the-production-workspace-module-4) below.
 
 The extension is named **Edge Studio**; the directory keeps its
 `module-1-prompt-composer` name because that's how the spec and ticket
@@ -25,6 +31,7 @@ docs refer to this module.
    **Insert**
 7. To pull work back out, switch to **Replies** and use **Latest
    response** (or highlight text in the page and use **Selection**)
+8. For video work, click **Production ↗** in the panel header
 
 ## What's implemented
 
@@ -55,6 +62,25 @@ docs refer to this module.
 | M2-5 Export-to-Drive fallback | ❌ Not started | Blocked on CORE-1/CORE-4, same as M1-3 |
 | M2-6 Reformat pipeline | ❌ Not started | P1 |
 | M2-7 Alternate export formats | ⚠️ Partial | **Copy MD** puts a saved response on the clipboard as Markdown; writing real files waits on Drive |
+| CORE-10 Shared chat round trip | ✅ | Optimize's send → wait → scrape loop extracted so the pipeline reuses it |
+| M4-1 Workspace scaffold | ✅ | Full window, opened from the panel; shares its modal, toast and stylesheet |
+| M4-2 Production/scene/shot model | ⚠️ Partial | Same local-storage stand-in as M1-3, behind the same seam |
+| M4-3 Scene rail + sequences | ✅ | Reorder, duplicate, bundle; a duplicate carries the shot but not the renders |
+| M4-4 Asset pool | ✅ | Search, category chips, tick to attach, double-click for the still |
+| M4-5 Asset intake | ✅ | Upload, URL or description; references and thumbnails, never copies |
+| M4-6 Running order | ✅ | Ten block types, drag to reorder, blanks marked |
+| M4-7 Shot builder | ✅ | The five sketched aspects, plus camera/motion/duration/ratio behind **More** |
+| M4-8 Per-block preview | ✅ | Selecting a block highlights its segment in the assembled prompt |
+| M4-9 Targets + job profiles | ✅ | Sora and Veo; seven profiles, defaults fill blanks only |
+| M4-10 Seed expansion | ✅ | Fills blanks only — see below |
+| M4-11 Chat to refine | ✅ | The one path allowed to rewrite what's already written |
+| M4-12 Scenes from a script | ✅ | The comic-page case: source material in, shot list out |
+| M4-13 In-box / out-box | ⚠️ Partial | Working, on local storage; real Drive folders wait on CORE-2/CORE-3 |
+| M4-14 Produce | ✅ | Writes the prompt into the generator tab and records it; never presses send |
+| M4-15 Review loop | ✅ | Keep / reject / regenerate with notes carried forward |
+| M4-16 Dailies report | ✅ | Markdown, filed to the out-box, downloadable |
+| M4-17 Import material | ✅ | JSON loads directly; freeform notes go through an open chat |
+| M4-18/19/20/21 | ❌ Not started | P1: cost estimate, continuity warnings, more generators, contact sheet |
 
 ## Variable placeholders
 
@@ -204,6 +230,55 @@ the Prompts tab so you can see what landed.
 Saved replies have their own filter, which matches on title, body text
 and source tab.
 
+## The production workspace (Module 4)
+
+Open it with **Production ↗**. It is a full extension page rather than a
+fourth panel tab because the layout is a scene rail plus three columns,
+which the side panel cannot carry.
+
+```
+ Scenes │ 1 · Assets      │ 2 · Running order  │ 3 · Shot builder
+ ───────┼─────────────────┼────────────────────┼──────────────────
+ Scene 1│ search + grid   │ seed               │ still
+ Scene 2│ tick to attach  │ Location           │ time of day
+ Scene 3│ upload / URL /  │ Setting            │ atmosphere
+ Seq. A │ describe        │ Scene / Action     │ look · lighting
+        │                 │ Set Dressing       │ exposure
+        │                 │ + add block        │ chat to refine
+        │                 │                    │ assembled preview
+```
+
+**The loop.** Write a seed — one line of what the shot is. **Fill
+blanks** asks an open chat for the empty blocks and aspects only, and
+applies only what it asked for; anything already written survives every
+pass untouched. Keep going until the scene is built, or fill blocks in
+by hand, or push it around with **Refine**, which is the one path
+allowed to rewrite what's already there.
+
+**Preview per block.** The assembled prompt is drawn segment by segment.
+Click into a block and its contribution lights up inside the whole, so
+you can see which part of the shot to change when the result is wrong.
+
+**Produce** rewords the shot for the chosen generator and writes it into
+that tab. Like Insert and Optimize, it fills the input and stops —
+nothing is submitted for you. What was sent is recorded in the out-box
+with the exact prompt, a field for the clip's link, and keep / reject /
+regenerate. A rejected pass's notes are carried into the next attempt
+rather than retyped. **File dailies report** turns the lot into Markdown.
+
+**In-box / out-box.** Drop scripts and images anywhere on the page:
+images join the asset pool, text files land in the in-box. From there a
+script becomes a shot list (**Break into shots**) or a pool of
+characters and locations (**Import material**).
+
+**Generators.** Sora (via ChatGPT) and Veo (via Gemini/Flow), per spec
+decision #12. Adding another is an entry in `VIDEO_TARGETS` in
+`studio/lib/prompt.js` with its own guidance — nothing else changes.
+
+**Assets are references.** An uploaded image is stored as a 320px
+thumbnail plus a note of the original's name, size and type. The bytes
+stay where they are; Drive becomes the canonical home when CORE-4 lands.
+
 ## Code layout
 
 The side panel is an ES module graph, one module per concern:
@@ -225,12 +300,38 @@ sidepanel/
     optimize.js       the platform-targeted rewrite loop
     replies.js        capture, save, and reuse
     usage.js          the Usage tab and the composer's cost meter
+    roundtrip.js      one trip through an open chat tab — shared
+
+studio/
+  studio.html         the production workspace page
+  studio.css          imports the panel's stylesheet, adds the layout
+  studio.js           entry — wires the modules together and starts them
+  lib/
+    model.js          data shapes, block types, aspects, categories
+    prompt.js         assembly, targets, profiles, requests, parsers
+    state.js          shared mutable page state
+    repository.js     every chrome.storage read/write — the CORE-4 seam
+    render.js         the redraw registry the columns talk through
+    files.js          reading dropped files; writing the report out
+    scenes.js         the scene rail, sequences, and productions
+    assets.js         column 1 — the asset pool
+    runorder.js       column 2 — the blocks of the script for the scene
+    shot.js           column 3 — still, aspects, refine, preview
+    seed.js           the chat round trips: expand, refine, script, import
+    produce.js        produce → out-box, and the dailies report
+    boxes.js          the in-box/out-box drawer and the review loop
 ```
 
 `variables.js` is deliberately dependency-free so it can be imported and
-tested outside a browser. `storage.js` is the one place that talks to
-`chrome.storage`, which is what makes the Drive swap below a contained
-change rather than a sweep.
+tested outside a browser; `model.js` and `prompt.js` are the same, which
+is what makes the per-block preview cheap enough to recompute on every
+keystroke. `storage.js` and `studio/lib/repository.js` are the only
+places that talk to `chrome.storage`, which is what makes the Drive swap
+below a contained change rather than a sweep.
+
+The workspace imports the panel's `modal.js`, `ui.js` and `roundtrip.js`
+directly instead of copying them. One dialog implementation, one toast,
+one send-and-scrape loop — a fix to any of them lands in both surfaces.
 
 ## What's stubbed and why (CORE-1 / CORE-4)
 
@@ -303,9 +404,11 @@ is the one thing to fix.
 
 ## Next up
 
-Phases 1 and 1.5 are complete, as is the Usage tab. What's left is
-mostly blocked on Phase 0: CORE-1/CORE-4 (Google auth and the
-Drive-backed repository, which the prompt library, saved replies, block
-types and usage figures are all waiting on), then M2-4/M2-5 (export to
-Drive) and M2-6 (the reformat pipeline). Module 3 (visual reference
-pipeline) is still unstarted.
+Phases 1 and 1.5 are complete, as is the Usage tab, and Phase 4's
+pipeline is working end to end on local storage. What's left is mostly
+blocked on Phase 0: CORE-1/CORE-4 (Google auth and the Drive-backed
+repository, which the prompt library, saved replies, block types, usage
+figures and now productions are all waiting on), then M2-4/M2-5 (export
+to Drive) and M2-6 (the reformat pipeline). Module 3 (visual reference
+pipeline) is still unstarted — Module 4 takes stills from wherever they
+come from, so it didn't wait.

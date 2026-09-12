@@ -16,6 +16,8 @@
 //   optimize.js   the platform-targeted rewrite loop
 //   replies.js    capture, save, and reuse
 //   usage.js      the Usage tab and the composer's cost meter
+//   roundtrip.js  one trip through an open chat tab, shared with the
+//                 production workspace
 //
 // The panel has three tabs — Prompts, Replies and Usage — over a shared
 // Chat tabs list, because Prompts and Replies act on the same ticked
@@ -41,6 +43,21 @@ function refreshBlockUI() {
 document
   .getElementById('manage-blocks-btn')
   .addEventListener('click', () => openBlockManager({ onSaved: refreshBlockUI }));
+
+// Module 4 lives in a full window rather than this panel: its three
+// columns need the width. Focus the tab if it's already open instead of
+// stacking up copies of the workspace.
+const STUDIO_URL = chrome.runtime.getURL('studio/studio.html');
+
+document.getElementById('open-studio-btn').addEventListener('click', async () => {
+  const [existing] = await chrome.tabs.query({ url: STUDIO_URL });
+  if (existing) {
+    await chrome.tabs.update(existing.id, { active: true });
+    await chrome.windows.update(existing.windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: STUDIO_URL });
+  }
+});
 
 async function init() {
   initTabs();

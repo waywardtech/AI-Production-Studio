@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Edge Studio — Production</title>
+  <link rel="stylesheet" href="studio.css" />
+</head>
+<body class="studio">
+
+  <header class="studio-header">
+    <div class="brand">
+      <h1>Edge Studio</h1>
+      <span class="subtitle">Video &amp; Media Production Pipeline</span>
+    </div>
+
+    <div class="header-controls">
+      <label class="control">
+        <span>Production</span>
+        <select id="production-select"></select>
+      </label>
+      <button id="new-production-btn" class="secondary compact">New</button>
+      <button id="rename-production-btn" class="secondary compact">Rename</button>
+
+      <label class="control">
+        <span>Generator</span>
+        <select id="target-select"></select>
+      </label>
+      <label class="control">
+        <span>Job profile</span>
+        <select id="profile-select"></select>
+      </label>
+
+      <button id="inbox-btn" class="secondary compact">In-box <span id="inbox-count" class="pill">0</span></button>
+      <button id="outbox-btn" class="secondary compact">Out-box <span id="outbox-count" class="pill">0</span></button>
+      <button id="produce-btn" class="compact">Produce</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+
+    <!-- Scene rail: scenes, and the sequences they bundle into (M4-3). -->
+    <aside id="scene-rail">
+      <div class="section-head">
+        <h2>Scenes</h2>
+        <button id="new-scene-btn" class="link-btn">+ New</button>
+      </div>
+      <ul id="scene-list" class="scene-list"></ul>
+      <div class="row">
+        <button id="duplicate-scene-btn" class="secondary compact">Duplicate</button>
+        <button id="delete-scene-btn" class="secondary compact">Delete</button>
+      </div>
+
+      <div class="section-head">
+        <h2>Sequences</h2>
+        <button id="new-sequence-btn" class="link-btn">+ Bundle</button>
+      </div>
+      <div id="sequence-list"></div>
+
+      <div class="rail-footer">
+        <button id="from-script-btn" class="secondary compact">Scenes from script…</button>
+        <button id="import-btn" class="secondary compact">Import material…</button>
+      </div>
+    </aside>
+
+    <!-- Column 1 — asset discovery, customization and creation (M4-4/M4-5). -->
+    <section class="column" id="col-assets">
+      <div class="section-head">
+        <h2>1 · Assets</h2>
+        <span id="asset-count" class="col-note"></span>
+      </div>
+      <p class="hint">Tick an asset to attach it to this scene. Double-click a
+        picture to make it the shot's opening frame.</p>
+      <input id="asset-search" type="text" placeholder="Search name, description or tag…" />
+      <div id="asset-categories" class="tag-filter-row"></div>
+      <div id="asset-grid" class="asset-grid"></div>
+      <div class="row">
+        <button id="asset-upload-btn" class="secondary compact">Upload</button>
+        <button id="asset-url-btn" class="secondary compact">From URL</button>
+        <button id="asset-describe-btn" class="secondary compact">Describe</button>
+      </div>
+      <input type="file" id="asset-file-input" accept="image/*" multiple hidden />
+    </section>
+
+    <!-- Column 2 — the blocks of the script for the scene (M4-6). -->
+    <section class="column" id="col-order">
+      <div class="section-head">
+        <h2>2 · Running order</h2>
+        <span id="blank-count" class="col-note"></span>
+      </div>
+      <label class="field-label" for="scene-seed">Scene seed</label>
+      <textarea id="scene-seed" rows="2"
+        placeholder="One line of intent — the rest gets filled in from here."></textarea>
+      <div class="row">
+        <button id="expand-btn" class="compact">Fill blanks</button>
+        <button id="add-block-btn" class="secondary compact">Add block</button>
+      </div>
+      <div id="block-list" class="block-list"></div>
+    </section>
+
+    <!-- Column 3 — scene builder via still, then refine (M4-7/M4-8/M4-11). -->
+    <section class="column" id="col-shot">
+      <div class="section-head">
+        <h2>3 · Shot builder</h2>
+        <button id="toggle-aspects-btn" class="link-btn">More</button>
+      </div>
+      <div id="still-slot" class="still-slot"></div>
+      <div id="aspect-list" class="aspect-list"></div>
+
+      <div class="section-head">
+        <h2>Refine</h2>
+        <button id="clear-refine-log-btn" class="link-btn">Clear log</button>
+      </div>
+      <div class="refine-row">
+        <input id="refine-input" type="text" placeholder="Make it night, add rain on the windscreen…" />
+        <button id="refine-btn" class="compact">Send</button>
+      </div>
+      <div id="refine-log" class="refine-log"></div>
+
+      <div class="section-head">
+        <h2>Preview</h2>
+        <button id="copy-prompt-btn" class="link-btn">Copy</button>
+      </div>
+      <div id="prompt-preview" class="prompt-preview"></div>
+    </section>
+  </main>
+
+  <!-- In-box / out-box (M4-13/M4-14/M4-15/M4-16). -->
+  <div id="drawer" class="drawer hidden">
+    <div class="drawer-head">
+      <h2 id="drawer-title">In-box</h2>
+      <div class="drawer-actions">
+        <button id="drawer-action-btn" class="secondary compact">Add note…</button>
+        <button id="drawer-close-btn" class="link-btn">Close</button>
+      </div>
+    </div>
+    <p id="drawer-hint" class="hint"></p>
+    <div id="drawer-body" class="drawer-body"></div>
+  </div>
+
+  <div id="drop-overlay" class="drop-overlay hidden">
+    <div>Drop scripts and images into the in-box</div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Same markup the side panel uses, so lib/modal.js serves both. -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-body" class="modal-body hidden"></p>
+      <div id="modal-fields"></div>
+      <div class="row">
+        <button id="modal-cancel-btn" class="secondary">Cancel</button>
+        <button id="modal-confirm-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="studio.js"></script>
+</body>
+</html>

@@ -21,14 +21,16 @@ The suite is built as **one shared core** (auth, storage, repository) with **ind
 │                      CORE LAYER                      │
 │  Google Auth · Drive Access · Repository · Archive    │
 └─────────────────────────────────────────────────────┘
-        │                 │                  │
-        ▼                 ▼                  ▼
-┌───────────────┐ ┌────────────────┐ ┌─────────────────┐
-│   Module 1     │ │   Module 2      │ │    Module 3      │
-│ Prompt Composer│ │ Response Manager│ │ Visual Reference │
-│ & Injection    │ │ & Archive       │ │ Pipeline          │
-└───────────────┘ └────────────────┘ └─────────────────┘
+        │             │              │               │
+        ▼             ▼              ▼               ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Module 1    │ │   Module 2    │ │   Module 3    │ │   Module 4    │
+│Prompt Composer│ │   Response    │ │    Visual     │ │ Video & Media │
+│  & Injection  │ │Mgr. & Archive │ │Ref. Pipeline  │ │  Production   │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
 ```
+
+Module 4 picks up where Module 3 stops: Module 3 approves a still, Module 4 turns stills, references and a script into produced clips.
 
 Every module reads and writes through the Core repository rather than keeping its own storage, so there's one consistent source of truth regardless of which AI platform actually did the work.
 
@@ -94,7 +96,7 @@ Every connected service (ChatGPT, Claude, Gemini, image-gen tools, etc.) reports
 - Historical usage trends per service, not just current state
 - Per-project or per-tag usage breakdowns
 
-Where a service doesn't expose usage data via an official API, this falls under the same general screen-scraping fallback policy as the rest of the suite (see §7).
+Where a service doesn't expose usage data via an official API, this falls under the same general screen-scraping fallback policy as the rest of the suite (see §8).
 
 ### Decisions
 - **Folder structure:** Projects are the top-level physical structure in Drive; each project folder contains a data-type layout underneath. A lightweight tag layer (a few standard system tags plus user-created ones) sits on top for cross-cutting filtering. Atomic documents are stored as links/references rather than duplicated copies.
@@ -116,7 +118,7 @@ Building good prompts from scratch every time, then manually retyping or pasting
 
 ### Non-Goals (v1)
 - Bypassing browser security to silently write into tabs the extension has no legitimate content-script access to — not attempting anything beyond what an extension is allowed to do
-- Full parity on mobile — desktop/extension is the primary target; mobile gets a degraded fallback (see §6)
+- Full parity on mobile — desktop/extension is the primary target; mobile gets a degraded fallback (see §8)
 - Auto-detecting *which* open ChatGPT tab belongs to which project without Dan labeling it first
 
 ### User Stories
@@ -252,7 +254,98 @@ Producing visual assets for a project (e.g., **V.O.**) currently means manually 
 
 ---
 
-## 7. Cross-Cutting Technical Constraints
+## 7. Module 4 — Video & Media Production Pipeline
+
+### Problem Statement
+Module 3 stops at an approved still. Turning those stills into finished clips is still done by hand: re-describing the same location and character in every prompt, keeping a shot's look consistent across a scene, remembering which generator wants which phrasing, and tracking what was produced from what. A page of a comic book that needs to become a sequence of clips currently means breaking it down on paper, writing each shot prompt from scratch, and filing the results manually afterwards.
+
+### Goals
+- A drag-and-drop **clip generation** workspace built on three columns: assets, running order, shot builder
+- Start from a **scene seed** and let each iteration fill in the blanks, building out the script / playbook / run book — or work block-by-block and fill the blanks by hand
+- Reuse scenes: duplicate an existing one, bundle scenes into **sequences**, rebuild scenes from a script
+- Preview per block, so the effect of changing one part of a shot on the whole result is visible before generating
+- **Optimize the prompt for the target video generator**, with job profiles for recurring kinds of work
+- **In-box / out-box folders** per production: scripts and assets go in, produced clips and a dailies report come out
+- Import existing production data — characters, scenes, locations, action sequences, dialogue, mood/lighting
+
+### Non-Goals (v1)
+- Rendering or stitching video inside the tool — generation happens on the platform, the suite composes the prompt, records the result, and files it
+- Editing/NLE features (timeline trimming, colour, audio mixing) — the out-box hands off to a real editor
+- Automatic frame-to-frame continuity enforcement — continuity is carried by reference assets and the wording of a shot's aspects, not verified by the tool
+- Unattended batch production — Dan is in the loop on every generate, same as Module 3
+
+### The Three-Column Workspace
+
+The workspace is one full-window page (the side panel is too narrow for it), with a scene rail on the left and three working columns:
+
+| Column | Purpose |
+|---|---|
+| **1 — Assets** | Discovery, customization and creation. Search media in Drive or on the web, upload it, or describe an asset that doesn't exist yet. Multi-select grid: ticked assets attach to the current scene, crossed-out ones are excluded. |
+| **2 — Running Order** | The blocks of the script for the scene, in order: Location, Setting, Scene/Action, Set Dressing, Characters, Dialogue, Camera, Sound, Transition. Drag to reorder, add or remove, and see at a glance which blocks are still blank. |
+| **3 — Shot Builder** | Scene builder via still, then refine. A still anchors the shot; its aspects — time of day, atmosphere, look, lighting, exposure, plus camera, motion, duration and aspect ratio — are editable inline. A "chat to refine" box takes plain-language changes. |
+
+### The Build Loop
+
+1. **Seed.** A scene starts as one line of intent.
+2. **Iterate.** Each expansion pass fills in *blanks only* — blocks and aspects Dan has already written stay untouched, so refinement is additive rather than destructive. Expansion runs in a chat tab that's already open, following the same hand-off rule as the Optimize step (decision #2 / #4): no bundled API key, no direct model call.
+3. **Or go manual.** Fill blocks in directly, or refine with a prompt of Dan's own wording.
+4. **Preview.** Every block shows its own contribution to the assembled prompt, and selecting one highlights its segment in the whole, so the impact of a change is visible before anything is generated.
+5. **Produce.** The assembled prompt is optimized for the chosen generator and job profile, handed to the generator's tab, and the result is recorded in the out-box with a link back to the session that made it.
+6. **Review.** Keep / reject / regenerate per render, with notes; notes carry into the regeneration. A **dailies report** summarises the session — what was produced, from which prompt, with which verdict.
+
+### User Stories
+- As Dan, I want to start a scene from one line and have the system fill in the blanks over successive passes, so that I get to a full shot description without writing every field myself.
+- As Dan, I want anything I've already written to survive an expansion pass, so that iterating never overwrites my own wording.
+- As Dan, I want to tick reference assets into a shot, so that the same location and character description doesn't get retyped for every clip.
+- As Dan, I want to reorder the blocks of a scene by dragging, so that the running order matches how the scene actually plays.
+- As Dan, I want to see what each block contributes to the final prompt, so that I can tell which part of a shot to change when the result is wrong.
+- As Dan, I want to duplicate a scene and bundle scenes into a sequence, so that repeated coverage isn't rebuilt from scratch.
+- As Dan, I want to drop a script into the in-box and have it broken into scenes and shots, so that a page of a comic book becomes a shot list I can work through.
+- As Dan, I want the prompt tuned for whichever generator I'm sending it to, so that I'm not rewriting the same shot three ways.
+- As Dan, I want job profiles for the kinds of work I do repeatedly, so that a vertical social clip and an establishing shot don't need the same settings entered by hand each time.
+- As Dan, I want produced clips and a dailies report to land in the production's out-box, so that a day's output is reviewable in one place.
+- As Dan, I want to import the characters, locations and scenes I already have written down, so that the pipeline starts from my existing material.
+
+### Requirements
+
+**Must-Have (P0)**
+- Production → Scene → Shot data model, with sequences grouping scenes, backed by the Core repository seam
+- Three-column workspace as described above, in a full-window extension page
+- Asset column: search/filter by name, description, tag and category; multi-select; add by upload, by URL (source URL always retained), or by description for an asset that doesn't exist yet
+- Running order: typed blocks, drag-to-reorder, add/remove, blank indicator
+- Shot builder: still + the five sketched aspects (time of day, atmosphere, look, lighting, exposure) plus camera, motion, duration and aspect ratio, all editable inline
+- Scene seed expansion that fills blanks only, run through an already-open chat tab
+- Chat-to-refine box that applies a plain-language change to the current shot
+- Per-block preview and highlight-in-assembled-prompt
+- Duplicate scene; bundle scenes into a sequence; rebuild scenes from a pasted or dropped script
+- Prompt optimization per target generator — **Sora (via ChatGPT) and Veo (via Gemini/Flow)** — plus job profiles for recurring work
+- In-box / out-box per production: drop scripts and assets in; produced clips, links and the dailies report out
+- Produce action: assemble → optimize → hand to the generator tab (clipboard fallback) → record the render
+- Review loop: keep / reject / regenerate with notes, notes carried into the regeneration
+- Dailies report generated from a session's renders, exportable as Markdown
+- Import of existing data: characters, scenes, locations, action sequences, dialogue, mood/lighting
+
+**Nice-to-Have (P1)**
+- Generator profiles beyond the first two (Runway, Kling, Luma)
+- Continuity warnings when a character or location is described differently across scenes in one sequence
+- Cost estimate per production run, feeding the Usage tab (CORE-8)
+- Storyboard contact sheet across a sequence
+
+**Future Considerations (P2)**
+- Self-hosted generation via ComfyUI workflows for volume beyond what web-tab generation sustains (see §10)
+- Multi-person handoff: assigning shots for review or generation
+- Audio/dialogue track assembly across a sequence
+
+### Decisions
+- **Surface:** a full-window extension page, not a side-panel tab — the three-column layout needs the width. It opens from the side panel and shares the panel's storage seam, modal and toast.
+- **Generation stays hands-off:** the pipeline composes and hands off the prompt exactly as Optimize does; it never presses send in Dan's chat and never carries an API key.
+- **Expansion is additive:** a pass fills blanks and leaves written fields alone. Overwriting is an explicit choice, never a side effect of iterating.
+- **Priority generators:** Sora (via ChatGPT) and Veo (via Gemini/Flow), matching the existing image-gen decision (#6).
+- **Storage:** productions live behind the same repository seam as everything else — local until CORE-4, Drive after, with no UI change. Dropped files are held as a reference plus a thumbnail rather than copied wholesale, consistent with the "links, not copies" rule (#1).
+
+---
+
+## 8. Cross-Cutting Technical Constraints
 
 - **Cross-tab injection is extension-only.** A web page cannot reach into another tab and type for security reasons. The realistic pattern is a browser extension with content scripts on each supported domain (ChatGPT, Claude, Gemini) plus a background service worker — architecturally similar to how a password manager like 1Password autofills fields. Each platform needs its own DOM adapter since their input UIs differ.
 - **Mobile is a degraded experience, not a blocked one.** iOS/mobile browser extension APIs are far more limited than desktop. The fallback path is: build the prompt in-app → copy to clipboard → clear "ready to paste" prompt → Dan manually switches app and pastes. This should be designed in from the start rather than bolted on later, since mobile use was explicitly called out as painful today.
@@ -263,7 +356,7 @@ Producing visual assets for a project (e.g., **V.O.**) currently means manually 
 
 ---
 
-## 8. Suggested Build Sequence
+## 9. Suggested Build Sequence
 
 | Phase | Scope |
 |---|---|
@@ -273,13 +366,16 @@ Producing visual assets for a project (e.g., **V.O.**) currently means manually 
 | **2** | Module 2: response capture, save/tag, send-to-prompt loop |
 | **2.5** | Chat archive export + re-seed-from-transcript |
 | **3** | Module 3: visual reference pipeline, stills only, ChatGPT + Gemini first |
-| **4 (future)** | Video generation, multi-person handoff, native mobile app, Firefox parity |
+| **4** | Module 4: video & media production pipeline — three-column workspace, scene seed/expansion loop, produce + dailies, Sora and Veo profiles |
+| **5 (future)** | Multi-person handoff, native mobile app, Firefox parity, self-hosted generation |
+
+Module 4 is built against the same repository seam as everything before it, so it does not wait on Phase 0 — it runs on local storage until Core lands, exactly as Modules 1 and 2 do today.
 
 ---
 
-## 9. Open-Source Building Blocks to Evaluate
+## 10. Open-Source Building Blocks to Evaluate
 
-Per the "don't reinvent the wheel" principle in §7, here's what's actually out there worth evaluating before building each piece from scratch. Adoption decisions (fork vs. use as reference vs. build fresh) are still Dan's call — this is a research pass, not a final selection.
+Per the "don't reinvent the wheel" principle in §8, here's what's actually out there worth evaluating before building each piece from scratch. Adoption decisions (fork vs. use as reference vs. build fresh) are still Dan's call — this is a research pass, not a final selection.
 
 **For Module 1 (Prompt Composer & Injection)**
 - **carlosguadian/universal-prompt-library** — a local-first Chrome extension to manage, organize, and inject prompts into ChatGPT, Claude, Gemini, and other chatbots, with folders, drag-and-drop, and variable placeholders. This is the closest existing match to Module 1's core loop and the strongest candidate to fork or study closely — it already solves prompt libraries, multi-platform injection, and JSON export/import.
@@ -295,7 +391,7 @@ Per the "don't reinvent the wheel" principle in §7, here's what's actually out 
 
 ---
 
-## 10. Decisions Log & Remaining Open Questions
+## 11. Decisions Log & Remaining Open Questions
 
 ### Decided
 | # | Question | Decision |
@@ -308,11 +404,15 @@ Per the "don't reinvent the wheel" principle in §7, here's what's actually out 
 | 6 | Priority image-gen platforms | ChatGPT and Gemini |
 | 7 | Punch list handoff format | Index document + final asset files + links back to the generating platform/session |
 | 8 | Usage warning threshold | Defaults to 10% of quota/budget remaining, editable per service |
-| 9 | Open-source tools worth evaluating | Researched — see §9 for candidates per module; final adoption still Dan's call |
+| 9 | Open-source tools worth evaluating | Researched — see §10 for candidates per module; final adoption still Dan's call |
 | 10 | System tag taxonomy | One standard tag — **Status** (Draft / In Review / Approved / Archived) — plus user-created custom tags on top |
+| 11 | Module 4 surface | A full-window extension page opened from the side panel, not a fourth panel tab — the three-column workspace needs the width |
+| 12 | Priority video generators | Sora (via ChatGPT) and Veo (via Gemini/Flow), matching decision #6 |
+| 13 | Scene expansion behaviour | Additive — a pass fills blanks only; overwriting written fields is an explicit choice, never a side effect of iterating |
+| 14 | Module 4 storage | Same repository seam as the other modules: local until CORE-4, Drive after. Dropped files are held as a reference plus a thumbnail, per #1 |
 
 *No open questions remain. All decisions above are ready to build against.*
 
 ---
 
-*This is a first-pass structural spec meant to confirm scope and sequencing before any build work starts. Once the phasing and open questions above are settled, Phase 0 (Core) and Phase 1 (Module 1 MVP) can be broken down into engineering-ready tickets.*
+*Phases 0–2 are ticketed in `tickets-phase-0-2.md`; Phase 4 is ticketed in `tickets-phase-4.md`. Module 3 (Phase 3) is spec'd but not yet ticketed.*

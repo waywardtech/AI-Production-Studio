@@ -8,6 +8,7 @@
 import { state } from './state.js';
 import { openModal } from './modal.js';
 import { showToast, copyToClipboard } from './ui.js';
+import { runRoundTrip, unfence } from './roundtrip.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
 import { assembledPrompt, setBuilderTo } from './builder.js';
 
@@ -42,10 +43,6 @@ export const OPTIMIZE_TARGETS = [
   },
 ];
 
-const POLL_MS = 2000;
-// Two unchanged polls before the answer counts as finished.
-const STABLE_TICKS = 2;
-
 export function buildOptimizationRequest(prompt, target) {
   return [
     `You are a prompt engineer. Rewrite the prompt below so it performs as well as possible on ${target.label}.`,
@@ -65,71 +62,8 @@ export function buildOptimizationRequest(prompt, target) {
   ].join('\n');
 }
 
-// The request asks for a fenced block precisely so this stays simple.
-// The preamble strip is a fallback for when the chat ignores that.
 export function cleanOptimizedPrompt(raw) {
-  const text = (raw || '').trim();
-  const fenced = text.match(/```[a-zA-Z]*\s*\n([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  return text.replace(/^(here(?:'s| is)\b[^\n:]*:?\s*)/i, '').trim();
-}
-
-async function captureFromTab(tabId) {
-  const result = await chrome.runtime.sendMessage({
-    type: 'EDGE_STUDIO_CAPTURE_RESPONSE',
-    tabId,
-  });
-  return result && result.success ? result.text : '';
-}
-
-// Polls the worker tab until its latest answer differs from the
-// baseline and has stopped growing — a streaming answer would otherwise
-// be scraped half-written.
-function waitForOptimizedReply(tabId, baseline, intro) {
-  let lastSeen = null;
-  let stableTicks = 0;
-  let captured = null;
-  let timer = null;
-
-  return openModal({
-    title: 'Waiting for the reply',
-    body: `${intro}\n\nWatching for the answer…`,
-    confirmLabel: 'Use latest now',
-    onOpen: (api) => {
-      timer = setInterval(async () => {
-        const text = await captureFromTab(tabId);
-        if (!text || text === baseline) return;
-
-        if (text === lastSeen) {
-          stableTicks += 1;
-          if (stableTicks >= STABLE_TICKS) {
-            captured = text;
-            clearInterval(timer);
-            api.confirm();
-          }
-        } else {
-          lastSeen = text;
-          stableTicks = 0;
-          api.setBody(`${intro}\n\nAnswer arriving — waiting for it to finish…`);
-        }
-      }, POLL_MS);
-      // However the dialog closes — poller, "Use latest now", Cancel or
-      // Escape — the interval is cleared in the .then() below.
-    },
-  }).then(async (result) => {
-    clearInterval(timer);
-    if (result === null) {
-      showToast('Optimization cancelled.', 'warning');
-      return null;
-    }
-    // Either the poller settled it, or Dan forced it early.
-    const text = captured || lastSeen || (await captureFromTab(tabId));
-    if (!text || text === baseline) {
-      showToast('No new reply found in that tab yet.', 'warning');
-      return null;
-    }
-    return cleanOptimizedPrompt(text);
-  });
+  return unfence(raw);
 }
 
 async function reviewOptimizedPrompt(optimized, target, workerName) {
@@ -209,38 +143,15 @@ async function runOptimize() {
   const target = OPTIMIZE_TARGETS.find((t) => t.id === setup.target);
   const workerName = tabDisplayName(workerTabId);
 
-  // Snapshot what's already on screen so a new answer can be told apart
-  // from the one that was there before.
-  const baseline = await captureFromTab(workerTabId);
-
-  const request = buildOptimizationRequest(prompt, target);
-  const sent = await chrome.runtime.sendMessage({
-    type: 'EDGE_STUDIO_SEND_TO_TAB',
+  const reply = await runRoundTrip({
     tabId: workerTabId,
-    text: request,
+    tabName: workerName,
+    text: buildOptimizationRequest(prompt, target),
+    title: 'Waiting for the rewrite',
   });
+  if (reply === null) return;
 
-  let intro;
-  if (sent && sent.success) {
-    // Injection fills the input but deliberately doesn't submit — the
-    // extension never presses send in Dan's chat.
-    intro = `Request written into "${workerName}". Press Enter there to send it.`;
-  } else {
-    const copied = await copyToClipboard(request);
-    if (!copied) {
-      showToast(
-        `Couldn't write into "${workerName}" and the clipboard is unavailable. Optimization cancelled.`,
-        'warning'
-      );
-      return;
-    }
-    intro = `Couldn't write into "${workerName}" — the request is on your clipboard. Paste and send it there.`;
-  }
-
-  const optimized = await waitForOptimizedReply(workerTabId, baseline, intro);
-  if (optimized === null) return;
-
-  await reviewOptimizedPrompt(optimized, target, workerName);
+  await reviewOptimizedPrompt(cleanOptimizedPrompt(reply), target, workerName);
 }
 
 export function initOptimize() {
