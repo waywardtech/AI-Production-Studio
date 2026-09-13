@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Edge Studio — Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body class="settings">
+  <main class="settings-page">
+    <header class="settings-header">
+      <h1>Edge Studio settings</h1>
+      <p class="subtitle">Google Docs, backups, and what's stored where.</p>
+    </header>
+
+    <!-- ---------------- GOOGLE DOCS ---------------- -->
+    <section class="card" id="google-card">
+      <div class="card-head">
+        <h2>Google Docs</h2>
+        <span id="google-status" class="status-pill">…</span>
+      </div>
+
+      <p class="lead">When connected, every prompt, reply, script and dailies report
+        is kept as a Google Doc, organised in folders by project — and edits you make
+        in Google Docs come back into Edge Studio.</p>
+
+      <!-- Connected -->
+      <div id="google-connected" class="hidden">
+        <dl class="facts">
+          <dt>Account</dt><dd id="google-account">—</dd>
+          <dt>Last sync</dt><dd id="google-last-sync">—</dd>
+          <dt>Folder</dt><dd><a id="google-folder-link" href="#" target="_blank" rel="noopener">Open “Edge Studio” in Drive ↗</a></dd>
+        </dl>
+        <p id="google-error" class="error-line hidden"></p>
+        <div class="row">
+          <button id="sync-now-btn">Sync now</button>
+          <button id="reconnect-btn" class="secondary hidden">Reconnect</button>
+          <button id="disconnect-btn" class="secondary">Disconnect</button>
+        </div>
+        <p class="hint">Disconnecting stops syncing from this browser. Your Docs and
+          folders stay in your Drive, untouched.</p>
+      </div>
+
+      <!-- Ready to connect -->
+      <div id="google-ready" class="hidden">
+        <p>Your client ID is saved. Connect to choose your Google account and allow
+          access to the files Edge Studio creates.</p>
+        <div class="row">
+          <button id="connect-btn">Connect Google</button>
+          <button id="change-client-btn" class="secondary">Change client ID</button>
+        </div>
+        <p id="connect-error" class="error-line hidden"></p>
+      </div>
+
+      <!-- One-time setup -->
+      <details id="google-setup" class="setup">
+        <summary>One-time setup: your Google Cloud client ID</summary>
+        <p>Google requires every app that uses Drive to have its own client ID, created
+          under your Google account. It takes about five minutes, once.</p>
+        <ol class="steps">
+          <li>
+            Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud Console → New project</a>.
+            Name it anything, e.g. <em>edge-studio</em>.
+          </li>
+          <li>
+            In that project, open <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">APIs &amp; Services → Library → Google Drive API</a>
+            and click <strong>Enable</strong>. That's the only API needed.
+          </li>
+          <li>
+            Open <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener">OAuth consent screen</a>.
+            <ul>
+              <li>If your Google account is a <strong>Google Workspace</strong> account
+                (your own domain), choose <strong>Internal</strong>. No review, no expiry.</li>
+              <li>Otherwise choose <strong>External</strong>, leave it in
+                <strong>Testing</strong>, and add your own address under
+                <strong>Test users</strong>. Google may ask you to reconnect about
+                once a week in this mode.</li>
+            </ul>
+          </li>
+          <li>
+            Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a> →
+            <strong>Create credentials → OAuth client ID</strong> → application type
+            <strong>Web application</strong>. Under <strong>Authorized redirect URIs</strong>,
+            add exactly:
+            <div class="copy-row">
+              <code id="redirect-uri">…</code>
+              <button id="copy-redirect-btn" class="secondary compact">Copy</button>
+            </div>
+            <p class="hint">This address is tied to this copy of the extension (ID
+              <code id="extension-id">…</code>). If you load Edge Studio from a different
+              folder, its ID and this address change, and the redirect URI in Google Cloud
+              needs updating to match.</p>
+          </li>
+          <li>
+            Copy the <strong>Client ID</strong> Google shows you (it ends in
+            <code>.apps.googleusercontent.com</code>) and paste it here:
+            <div class="copy-row">
+              <input id="client-id-input" type="text" spellcheck="false"
+                     placeholder="1234567890-abc123.apps.googleusercontent.com" />
+              <button id="save-client-btn" class="compact">Save</button>
+            </div>
+          </li>
+        </ol>
+        <p class="hint">Edge Studio asks for two narrow permissions: access to
+          <strong>only the files it creates</strong> (not the rest of your Drive), and a
+          hidden app-data folder for its index. Neither is a “sensitive” scope, so no
+          Google verification is needed.</p>
+      </details>
+    </section>
+
+    <!-- ---------------- WHAT GOES WHERE ---------------- -->
+    <section class="card">
+      <h2>What goes where in Drive</h2>
+<pre class="tree">Edge Studio/
+  <em>Project</em>/
+    Prompts/        a Doc per saved prompt — edit the text under each [Heading]
+    Replies/        a Doc per saved reply
+    Productions/
+      <em>Production</em>/   its generated shot list
+        In-box/     a Doc per script or note
+        Out-box/    a Doc per dailies report</pre>
+      <p class="hint">Deleting something in Edge Studio moves its Doc to your Drive
+        trash, so it can be restored. Asset references, block types, scenes and tags are
+        kept in a small hidden index, which is how a second computer picks up exactly where
+        this one left off.</p>
+    </section>
+
+    <!-- ---------------- BACKUP ---------------- -->
+    <section class="card">
+      <h2>Backup</h2>
+      <p>A single file with every project, prompt, reply, production, asset and document
+        in this browser — useful before big changes, or to move to another browser without
+        Google.</p>
+      <div class="row">
+        <button id="export-btn" class="secondary">Download backup</button>
+        <button id="import-btn" class="secondary">Restore from backup…</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json,.json" hidden />
+      <dl class="facts" id="counts"></dl>
+    </section>
+
+    <footer class="settings-footer">
+      <span id="version"></span>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-body" class="modal-body hidden"></p>
+      <div id="modal-fields"></div>
+      <div class="row">
+        <button id="modal-cancel-btn" class="secondary">Cancel</button>
+        <button id="modal-confirm-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

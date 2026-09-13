@@ -300,10 +300,17 @@ shared/
   projects.js         the active project, and create/rename/delete
   project-bar.js      the project switcher both pages show
   migrate.js          brings data from earlier builds into projects
+  google-auth.js      signing in to Google; tokens kept per session
+  drive.js            the few Drive v3 calls Edge Studio makes
+  docs-format.js      how records read as Docs, and how edits come back
+  sync.js             pull, read back, push — the Google Docs sync engine
+  sync-status.js      the "where is my work" indicator
   modal.js            the one dialog both pages use
   ui.js               toasts, tab switching, clipboard, selection
   roundtrip.js        one trip through an open chat tab: send, wait, read
   variables.js        <placeholder> logic — pure, no DOM, no chrome APIs
+
+settings/             Google Docs connection, backup and restore
 
 sidepanel/
   sidepanel.js        entry — wires the modules together and starts them
@@ -344,7 +351,9 @@ tested outside a browser; `model.js` and `prompt.js` are the same, which
 is what makes the per-block preview cheap enough to recompute on every
 keystroke. `shared/store.js` is the only place that talks to
 `chrome.storage` for durable data, so the pages never know or care
-whether a record came from this browser or from Google Drive.
+whether a record came from this browser or from Google Drive. Sync runs
+only in the background worker (`background.js`), so two open pages can
+never push the same change twice.
 
 Neither page imports the other's code: what they share is in `shared/`.
 One dialog implementation, one toast, one send-and-scrape loop — a fix to
@@ -373,9 +382,76 @@ the first time any page or the background worker starts: it lands in
 "My first project", and a copy of exactly what was there is kept under
 `es:backup:v1`.
 
-Google Docs — every document as a Doc in the project's Drive folder —
-is the next stage; until it's connected everything stays in this browser
-profile.
+## Google Docs (CORE-1 / CORE-4)
+
+Connect Google in **Settings** (⚙ in either page's header) and every
+document Edge Studio keeps becomes a real Google Doc, organised by
+project:
+
+```
+Edge Studio/
+  <Project>/
+    Prompts/        a Doc per saved prompt — edit the text under each [Heading]
+    Replies/        a Doc per saved reply
+    Productions/
+      <Production>/   its generated shot list
+        In-box/     a Doc per script or note
+        Out-box/    a Doc per dailies report
+```
+
+- **Edits in Google Docs come back.** Change a prompt's text under its
+  `[Scenario]` heading, add a `[Format]` heading, fix a typo in a reply
+  or a script — the next sync reads it into Edge Studio. If the same
+  thing was also changed in Edge Studio since, the later edit wins. A
+  prompt Doc stripped of every heading is left alone rather than
+  collapsing its blocks. The production shot list is the exception: it's
+  generated from the studio and says so at the bottom.
+- **Deleting moves Docs to Drive's trash**, so anything removed in Edge
+  Studio can be restored in Drive.
+- **Tags and status** go into each Doc's Drive description, so Drive's
+  own search finds "apex".
+- **A second computer catches up** from a small hidden index Edge Studio
+  keeps in Drive's app-data folder — blocks, scenes, asset references and
+  the links between records — without duplicating a single Doc.
+- **Sync runs in the background**: a few seconds after an edit, every
+  five minutes for changes made elsewhere, and on **Sync now**. The line
+  under the project bar says where things stand: *Local only*, *In Google
+  Docs · 2 min ago*, *Syncing…*, or *Reconnect Google* / *Sync issue*,
+  which open Settings.
+
+**Setting it up** takes about five minutes, once — Settings walks
+through it and shows the exact values to paste:
+
+1. Create a Google Cloud project and enable the **Google Drive API** (the
+   only API needed).
+2. Configure the OAuth consent screen: **Internal** if your account is
+   Google Workspace; otherwise **External**, left in **Testing**, with
+   your own address as a test user (Google may then ask you to reconnect
+   about weekly).
+3. Create an **OAuth client ID** of type **Web application**, with the
+   redirect URI Settings shows (`https://<extension-id>.chromiumapp.org/`).
+4. Paste the client ID into Settings and **Connect**.
+
+Edge Studio asks for two narrow permissions — `drive.file` (only files
+it creates, never the rest of your Drive) and `drive.appdata` (its hidden
+index). Neither is a sensitive scope, so no Google review is involved.
+Access tokens stay in session storage and are never written to disk.
+
+The extension ID is derived from the folder it's loaded from, so the
+redirect URI changes if Edge Studio is loaded from somewhere else — the
+Settings page always shows the current one.
+
+**What's verified, and what isn't.** The sync engine is tested against a
+simulated Drive that implements the documented API contract (see
+`tests/sync.test.mjs` — first sync, quiet re-syncs, edits both ways,
+conflicts, trash, a second machine, token renewal). It has not been run
+against Google's live servers, because that needs your client ID; the
+first real sync is the confirmation.
+
+**Backup.** Settings can download everything in this browser as one file
+and restore it later. Restoring merges — a record comes in only if it's
+missing or the backup's copy is newer — so an old backup can't undo newer
+work.
 
 ## Tab labels are per browser session
 

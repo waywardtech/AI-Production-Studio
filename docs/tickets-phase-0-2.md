@@ -6,24 +6,28 @@ Derived from `far-edge-studio-productivity-suite-spec.md`. Covers **Phase 0 (Cor
 
 ## Epic: Phase 0 — Core Platform Layer
 
-**CORE-1 — Google OAuth login flow**
+**CORE-1 — Google OAuth login flow** ✅ *Implemented*
 Implement Google OAuth 2.0 sign-in scoped to Drive read/write, for dan@thefaredge.com.
 *Acceptance:* User can sign in; token refresh handled silently; only Drive scopes requested.
+*Built as:* Settings → Connect, via chrome.identity.launchWebAuthFlow with a Web-application client ID pasted into Settings (no manifest edit). Scopes are drive.file + drive.appdata — narrower than read/write on all of Drive, and non-sensitive. Tokens renew silently and live in session storage; if Google needs a click, sync pauses with Reconnect.
 
-**CORE-2 — Drive folder picker component**
+**CORE-2 — Drive folder picker component** ⚠️ *Superseded*
 Reusable component any module can call to select/target a specific Drive folder.
 *Acceptance:* Returns a folder ID/path usable by the calling module.
 *Depends on:* CORE-1
+*Built as:* Rather than pointing modules at arbitrary folders (which drive.file can't see anyway), Edge Studio creates and owns an `Edge Studio/<Project>/…` tree. Folders are found again by id and app properties, not name, so renaming one in Drive doesn't fork it.
 
-**CORE-3 — Project folder structure scaffolding**
+**CORE-3 — Project folder structure scaffolding** ✅ *Implemented*
 Auto-create the standard project folder tree in Drive (subfolders: prompts / responses / visual-assets / archives) when a new project is started.
 *Acceptance:* "New Project" produces the correct folder structure with no manual setup.
+*Built as:* Each project gets Prompts, Replies and Productions folders; each production gets In-box and Out-box. Created on first sync.
 
-**CORE-4 — Repository schema & index**
+**CORE-4 — Repository schema & index** ✅ *Implemented*
 Define and implement the schema for prompt blocks, saved prompts, saved responses, and chat archives. Documents are referenced by link (not duplicated); maintain an internal link index as fallback where a platform's Drive integration is unreliable.
 *Acceptance:* CRUD works against the schema; every repository item resolves to a link, not a copy.
+*Built as:* shared/store.js (one key per record, projects as the organising unit) locally; in Drive, a Google Doc per document plus a hidden app-data index file per record. Two-way: edits in Docs are read back; the later edit wins a conflict; deletions trash rather than destroy.
 
-**CORE-5 — Tagging layer (system + custom tags)** ⚠️ *Partial — prompts and replies, local storage*
+**CORE-5 — Tagging layer (system + custom tags)** ⚠️ *Partial — prompts and replies*
 Gmail-labels-style tagging: one standard system tag, **Status** (Draft / In Review / Approved / Archived), always present, plus user-created custom tags on top. Applies to prompts, responses, and assets.
 *Acceptance:* Every repository item carries a Status value; custom tags can be created, applied, removed, and filtered on.
 *Built as:* Saved prompts and replies carry Status (Draft / In Review / Approved / Archived, editable on prompts). Prompts also take free-form tags, stored lowercase, filtered by chip and grouped by tag with multi-tag membership. Not yet applied to visual assets, and backed by local storage until CORE-4.
@@ -32,8 +36,9 @@ Gmail-labels-style tagging: one standard system tag, **Status** (Draft / In Revi
 Capture a full chat transcript from a tracked tab and save it as a timestamped Drive file under the project's archive folder.
 *Acceptance:* Exported file is readable and linked in the repository index.
 
-**CORE-7 — Repository export/import (P1)**
+**CORE-7 — Repository export/import (P1)** ✅ *Implemented*
 Export/import the repository index as a portable JSON bundle (not the underlying Drive files, which stay in place).
+*Built as:* Settings → Download backup / Restore from backup. Restore merges by record: missing or newer copies come in, nothing is deleted or replaced with an older version.
 
 **CORE-8 — Usage tab shell** ✅ *Implemented*
 Build the Usage tab UI: per-service rows with a percentage/thermometer indicator.

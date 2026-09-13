@@ -3,6 +3,7 @@
 
 import { state } from './state.js';
 import { listPrompts, savePrompt, deletePrompt as removePrompt } from './storage.js';
+import { getSyncMeta } from '../../shared/store.js';
 import { STATUSES, newPrompt, parseTags } from '../../shared/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, switchTab } from '../../shared/ui.js';
@@ -97,7 +98,7 @@ async function deletePrompt(item) {
   await renderLibrary();
 }
 
-function buildPromptRow(item) {
+function buildPromptRow(item, meta = null) {
   const li = document.createElement('li');
   li.className = 'library-item';
 
@@ -119,6 +120,18 @@ function buildPromptRow(item) {
   status.className = 'status-tag';
   status.textContent = item.status || 'Draft';
   head.appendChild(status);
+
+  // Once synced, the prompt is a Google Doc — open it there.
+  if (meta?.docUrl) {
+    const doc = document.createElement('a');
+    doc.className = 'doc-link';
+    doc.href = meta.docUrl;
+    doc.target = '_blank';
+    doc.rel = 'noopener';
+    doc.textContent = 'Doc ↗';
+    doc.title = 'Open in Google Docs';
+    head.appendChild(doc);
+  }
 
   const edit = document.createElement('span');
   edit.className = 'row-action';
@@ -202,6 +215,10 @@ export async function renderLibrary() {
       (item.tags || []).some((t) => t.includes(q))
   );
 
+  const metas = new Map(
+    await Promise.all(visible.map(async (item) => [item.id, await getSyncMeta('prompts', item.id)]))
+  );
+
   libraryListEl.innerHTML = '';
 
   if (visible.length === 0) {
@@ -218,7 +235,7 @@ export async function renderLibrary() {
     list.className = 'library-group-list';
     visible
       .filter((item) => (item.tags || []).includes(state.activeTagFilter))
-      .forEach((item) => list.appendChild(buildPromptRow(item)));
+      .forEach((item) => list.appendChild(buildPromptRow(item, metas.get(item.id))));
 
     if (!list.children.length) {
       appendEmpty('No matches in this tag.');
@@ -244,7 +261,7 @@ export async function renderLibrary() {
 
     const list = document.createElement('ul');
     list.className = 'library-group-list';
-    group.items.forEach((item) => list.appendChild(buildPromptRow(item)));
+    group.items.forEach((item) => list.appendChild(buildPromptRow(item, metas.get(item.id))));
     libraryListEl.appendChild(list);
   });
 }

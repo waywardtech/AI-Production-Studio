@@ -867,3 +867,50 @@ button.danger {
 .project-bar .link-btn {
   white-space: nowrap;
 }
+
+/* ---------- Header links, sync indicator, Doc links ---------- */
+
+.header-links {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sync-status {
+  display: block;
+  margin: -2px 0 8px auto;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 10px;
+  color: #8d8f99;
+  cursor: pointer;
+  text-align: right;
+}
+
+.sync-status::before {
+  content: '●';
+  margin-right: 5px;
+  font-size: 8px;
+  vertical-align: 1px;
+}
+
+.sync-status:hover { color: #d3d4d9; filter: none; }
+.sync-status[data-state="off"]::before { color: #6f7178; }
+.sync-status[data-state="idle"]::before { color: #74c69d; }
+.sync-status[data-state="syncing"]::before { color: #7f92ff; }
+.sync-status[data-state="error"],
+.sync-status[data-state="reconnect"] { color: #e8837a; }
+.sync-status[data-state="error"]::before,
+.sync-status[data-state="reconnect"]::before { color: #e8837a; }
+
+.doc-link {
+  font-size: 10px;
+  color: #7f92ff;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.doc-link:hover {
+  text-decoration: underline;
+}

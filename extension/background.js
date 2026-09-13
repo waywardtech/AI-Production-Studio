@@ -1,8 +1,20 @@
 // Edge Studio — background service worker
 // Covers: M1-1 (extension scaffold), M1-5/M1.5-6 (tab detection across
-// ChatGPT, Claude and Gemini), M1-7/M1-8 (send-to-tab relay)
+// ChatGPT, Claude and Gemini), M1-7/M1-8 (send-to-tab relay), and
+// CORE-4 (keeping the record store in step with Google Docs).
 
 import { migrate } from './shared/migrate.js';
+import { getSetting, list, subscribe } from './shared/store.js';
+import { createDrive } from './shared/drive.js';
+import { getAccessToken, invalidateToken } from './shared/google-auth.js';
+import { createSyncEngine } from './shared/sync.js';
+import { assembleSegments, profileById, segmentText, targetById } from './studio/lib/prompt.js';
+
+const SYNC_ALARM = 'edge-studio-sync';
+const SYNC_EVERY_MINUTES = 5;
+// After an edit, wait this long for more before syncing, so typing a
+// paragraph is one sync, not forty.
+const SYNC_DEBOUNCE_MS = 4000;
 
 // Installing or updating brings stored data into the current shape
 // straight away, rather than waiting for the first page to open. Every
@@ -13,6 +25,90 @@ chrome.runtime.onInstalled.addListener(() => {
       if (result.migrated) console.log('[Edge Studio] Migrated stored data:', result);
     })
     .catch((error) => console.error('[Edge Studio] Migration failed:', error));
+  chrome.alarms.create(SYNC_ALARM, { periodInMinutes: SYNC_EVERY_MINUTES });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  chrome.alarms.create(SYNC_ALARM, { periodInMinutes: SYNC_EVERY_MINUTES });
+  scheduleSync(2000);
+});
+
+// ---------- CORE-4: Google Docs sync ----------
+//
+// This worker is the only place sync runs, so two open pages can never
+// push the same change twice. Pages ask for a sync by message; edits
+// trigger one by themselves through storage change events; an alarm
+// catches up with edits made on other machines or directly in Docs.
+
+const drive = createDrive({
+  fetchImpl: (...args) => fetch(...args),
+  auth: { getAccessToken, invalidateToken },
+});
+
+// The shot list Doc is the studio's own assembled prompt per scene, so
+// the Doc reads exactly like what Produce would send.
+async function productionContext(production) {
+  const assets = await list('assets', { projectId: production.projectId });
+  return {
+    assembleShot: (scene) =>
+      assembleSegments(production, scene, { assets }).map(segmentText).join('\n\n'),
+    targetLabel: targetById(production.target).label,
+    profileLabel: profileById(production.profile).label,
+  };
+}
+
+const engine = createSyncEngine({ drive, productionContext });
+
+let running = null;
+let again = false;
+let timer = null;
+
+async function runSync() {
+  if (running) {
+    again = true;
+    return running;
+  }
+  running = (async () => {
+    let last;
+    try {
+      do {
+        again = false;
+        last = await engine.run();
+      } while (again);
+    } catch (error) {
+      console.error('[Edge Studio] Sync failed:', error);
+    } finally {
+      running = null;
+    }
+    return last;
+  })();
+  return running;
+}
+
+function scheduleSync(delay = SYNC_DEBOUNCE_MS) {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const google = (await getSetting('google', {})) || {};
+    if (google.connected) runSync();
+  }, delay);
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === SYNC_ALARM) scheduleSync(0);
+});
+
+// Records changed by a page (not by this worker's own sync) are due for
+// upload. Connecting Google starts a first sync straight away.
+subscribe((events) => {
+  let due = false;
+  events.forEach((event) => {
+    if (event.self) return;
+    if (event.kind === 'record') due = true;
+    if (event.kind === 'setting' && event.name === 'google' && event.record?.connected && !event.previous?.connected) {
+      scheduleSync(500);
+    }
+  });
+  if (due) scheduleSync();
 });
 
 // Open the side panel when the toolbar icon is clicked.
@@ -95,6 +191,11 @@ async function relayToTab(tabId, message) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'EDGE_STUDIO_SYNC_NOW') {
+    runSync().then((summary) => sendResponse(summary || null));
+    return true;
+  }
+
   if (message.type === 'EDGE_STUDIO_GET_TABS') {
     findChatTabs().then(sendResponse);
     return true; // keep the message channel open for the async response

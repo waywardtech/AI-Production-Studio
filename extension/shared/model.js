@@ -10,6 +10,16 @@ import { newId, nowISO } from './store.js';
 
 export const STATUSES = ['Draft', 'In Review', 'Approved', 'Archived'];
 
+// The side panel's prompt block types before anyone edits them in
+// Blocks → Manage. Here rather than in the panel so the background
+// worker can label blocks when it writes a prompt out as a Google Doc.
+export const DEFAULT_BLOCK_TYPES = [
+  { id: 'scenario', label: 'Scenario' },
+  { id: 'expertise', label: 'Expertise' },
+  { id: 'ask', label: 'Ask' },
+  { id: 'format', label: 'Format' },
+];
+
 // Tags are stored lowercase so "Apex", "apex" and "APEX" are one group.
 export function parseTags(raw) {
   const list = Array.isArray(raw) ? raw : String(raw || '').split(',');

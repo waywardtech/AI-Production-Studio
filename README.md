@@ -59,9 +59,13 @@ whole shot list out of a script. Prompts are shaped for **Sora** and
 tab, and recorded in an out-box with keep / reject / regenerate and a
 Markdown dailies report.
 
-**Core (auth/Drive)** — spec'd and ticketed, not yet built. It is what
-the prompt library, saved replies and productions are all waiting on to
-move off local storage.
+**Core — projects and Google Docs (CORE-1/3/4/5/7)** — everything is
+organised by project, shared by both pages. Connected to Google (in
+Settings), every prompt, reply, script and dailies report is a Google Doc
+in `Edge Studio/<Project>/…`, edits made in Docs come back, deletions go
+to Drive's trash, and a second computer catches up from a hidden index.
+The sync engine is tested against a simulated Drive; the first live sync
+with your own OAuth client is its real-world confirmation.
 
 **Module 3 (Visual Reference Pipeline)** — spec'd, not yet ticketed or
 built. Module 4 doesn't wait on it: it takes stills from wherever they

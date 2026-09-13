@@ -3,6 +3,7 @@
 import { state } from './state.js';
 import { listReplies, saveReply, deleteReply } from './storage.js';
 import { newReply } from '../../shared/model.js';
+import { getSyncMeta } from '../../shared/store.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard, selectedTextOf } from '../../shared/ui.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
@@ -209,6 +210,10 @@ export async function renderResponses() {
       )
     : responses;
 
+  const metas = new Map(
+    await Promise.all(filtered.map(async (item) => [item.id, await getSyncMeta('replies', item.id)]))
+  );
+
   responseListEl.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -235,6 +240,18 @@ export async function renderResponses() {
     status.className = 'status-tag';
     status.textContent = item.status || 'Draft';
     head.appendChild(status);
+
+    const syncMeta = metas.get(item.id);
+    if (syncMeta?.docUrl) {
+      const doc = document.createElement('a');
+      doc.className = 'doc-link';
+      doc.href = syncMeta.docUrl;
+      doc.target = '_blank';
+      doc.rel = 'noopener';
+      doc.textContent = 'Doc ↗';
+      doc.title = 'Open in Google Docs';
+      head.appendChild(doc);
+    }
 
     li.appendChild(head);
 

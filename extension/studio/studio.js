@@ -37,6 +37,7 @@ import { initBoxes, renderDrawer } from './lib/boxes.js';
 import { migrate } from '../shared/migrate.js';
 import { subscribe } from '../shared/store.js';
 import { mountProjectBar } from '../shared/project-bar.js';
+import { mountSyncStatus } from '../shared/sync-status.js';
 
 registerRenderer('scenes', renderScenes);
 registerRenderer('assets', renderAssets);
@@ -85,6 +86,9 @@ function followStoreChanges() {
         if (e.collection === 'documents' && applyExternal(state.documents, e)) due.add('drawer');
       });
 
+    // A document reaching Google Docs gets its "Doc ↗" link.
+    if (events.some((e) => e.kind === 'sync' && e.collection === 'documents')) due.add('drawer');
+
     if (due.has('all')) renderAll();
     else {
       if (due.has('assets')) render('assets', 'shot');
@@ -120,6 +124,8 @@ async function init() {
   });
 
   followStoreChanges();
+  await mountSyncStatus(document.getElementById('sync-status'));
+  document.getElementById('open-settings-btn').addEventListener('click', () => chrome.runtime.openOptionsPage());
 }
 
 init();

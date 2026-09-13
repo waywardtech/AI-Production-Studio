@@ -1,0 +1,182 @@
+/* Settings — a single readable column. Buttons, inputs, the modal and
+   the toast come from the side panel's stylesheet so all three pages
+   look like one product. */
+
+@import url("../sidepanel/sidepanel.css");
+
+body.settings {
+  padding: 0;
+}
+
+.settings-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.settings-header h1 {
+  font-size: 20px;
+  margin: 0 0 2px;
+}
+
+.settings-header .subtitle {
+  margin: 0 0 20px;
+  font-size: 12px;
+}
+
+.card {
+  background: #1c1d22;
+  border: 1px solid #2b2d34;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-head h2 {
+  margin: 0;
+}
+
+.lead {
+  color: #c3c5cd;
+  margin: 8px 0 14px;
+}
+
+.status-pill {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  border: 1px solid #3a3c45;
+  color: #a9abb4;
+  background: #22242b;
+  white-space: nowrap;
+}
+
+.status-pill[data-state="idle"] { color: #74c69d; border-color: #2f5a44; }
+.status-pill[data-state="syncing"] { color: #7f92ff; border-color: #3a4580; }
+.status-pill[data-state="error"],
+.status-pill[data-state="reconnect"] { color: #e8837a; border-color: #7d3630; }
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 10px 0 14px;
+}
+
+.facts dt {
+  color: #8d8f99;
+}
+
+.facts dd {
+  margin: 0;
+  color: #e7e7ea;
+  overflow-wrap: anywhere;
+}
+
+.error-line {
+  color: #e8837a;
+  margin: 6px 0 10px;
+}
+
+.error-line.hidden,
+#google-connected.hidden,
+#google-ready.hidden,
+#reconnect-btn.hidden {
+  display: none;
+}
+
+.setup {
+  margin-top: 12px;
+  border-top: 1px solid #2b2d34;
+  padding-top: 10px;
+}
+
+.setup summary {
+  cursor: pointer;
+  color: #7f92ff;
+  font-weight: 600;
+}
+
+.steps {
+  padding-left: 20px;
+}
+
+.steps li {
+  margin: 10px 0;
+}
+
+.steps ul {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.copy-row code,
+.copy-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.copy-row button {
+  flex: 0 0 auto;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #d3d4d9;
+}
+
+a {
+  color: #7f92ff;
+}
+
+.tree {
+  background: #14151a;
+  border: 1px solid #2b2d34;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #c3c5cd;
+}
+
+.tree em {
+  color: #f5a623;
+  font-style: normal;
+}
+
+.settings-footer {
+  color: #6f7178;
+  font-size: 11px;
+  text-align: center;
+}

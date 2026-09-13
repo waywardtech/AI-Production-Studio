@@ -70,11 +70,16 @@ export async function list(collection, { projectId, includeDeleted = false } = {
 }
 
 export async function get(collection, id) {
+  const record = await getIncludingDeleted(collection, id);
+  return record && !record.deletedAt ? record : null;
+}
+
+// For the sync engine, which has to see tombstones to act on them.
+export async function getIncludingDeleted(collection, id) {
   assertCollection(collection);
   const key = recordKey(collection, id);
   const data = await chrome.storage.local.get(key);
-  const record = data[key] || null;
-  return record && !record.deletedAt ? record : null;
+  return data[key] || null;
 }
 
 // Saves a record, stamping createdAt/updatedAt. The record passed in is
@@ -195,7 +200,17 @@ export function subscribe(listener) {
     const events = [];
 
     Object.entries(changes).forEach(([key, change]) => {
-      if (!key.startsWith(PREFIX) || key.startsWith(`${PREFIX}sync:`)) return;
+      if (!key.startsWith(PREFIX)) return;
+
+      // Sync bookkeeping is reported as its own kind, so a page can show
+      // a "Doc ↗" link the moment a record reaches Google Docs, while
+      // anything reacting to record edits ignores it.
+      const sync = key.match(/^es:sync:([^:]+):(.+)$/);
+      if (sync) {
+        events.push({ kind: 'sync', collection: sync[1], id: sync[2], record: change.newValue ?? null, self: false });
+        return;
+      }
+
       const match = key.match(/^es:([^:]+):(.+)$/);
       if (!match) return;
       const [, kind, id] = match;

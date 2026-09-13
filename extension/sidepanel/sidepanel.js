@@ -4,7 +4,7 @@
 // in lib/, one module per concern:
 //
 //   state.js      shared mutable panel state
-//   storage.js    every chrome.storage read/write (the CORE-4 seam)
+//   storage.js    the panel's reads and writes, on shared/store.js
 //   blocks.js     block types: palette and the Manage editor
 //   builder.js    the canvas, and everything that puts text into it
 //   library.js    saved prompts, tags and grouping
@@ -34,6 +34,7 @@ import { state } from './lib/state.js';
 import { migrate } from '../shared/migrate.js';
 import { subscribe } from '../shared/store.js';
 import { mountProjectBar } from '../shared/project-bar.js';
+import { mountSyncStatus } from '../shared/sync-status.js';
 
 // blocks.js owns the palette but shouldn't have to know how the builder
 // renders, so the two are joined here rather than importing each other.
@@ -50,6 +51,8 @@ document
 // columns need the width. Focus the tab if it's already open instead of
 // stacking up copies of the workspace.
 const STUDIO_URL = chrome.runtime.getURL('studio/studio.html');
+
+document.getElementById('open-settings-btn').addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 document.getElementById('open-studio-btn').addEventListener('click', async () => {
   const [existing] = await chrome.tabs.query({ url: STUDIO_URL });
@@ -72,8 +75,8 @@ function followStoreChanges() {
     events
       .filter((e) => !e.self)
       .forEach((e) => {
-        if (e.kind === 'record' && e.collection === 'prompts') queued.add('library');
-        if (e.kind === 'record' && e.collection === 'replies') queued.add('replies');
+        if ((e.kind === 'record' || e.kind === 'sync') && e.collection === 'prompts') queued.add('library');
+        if ((e.kind === 'record' || e.kind === 'sync') && e.collection === 'replies') queued.add('replies');
         if (e.kind === 'setting' && e.name === 'usage') queued.add('usage');
         if (e.kind === 'setting' && e.name === 'app') queued.add('blocks');
       });
@@ -133,6 +136,7 @@ async function init() {
   });
 
   followStoreChanges();
+  await mountSyncStatus(document.getElementById('sync-status'));
   await refreshTabs();
   updateCostEstimate();
 }

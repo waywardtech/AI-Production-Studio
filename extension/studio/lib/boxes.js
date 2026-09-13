@@ -22,6 +22,7 @@ import { render } from './render.js';
 import { touch } from './model.js';
 import { targetById } from './prompt.js';
 import { newDocument } from '../../shared/model.js';
+import { getSyncMeta } from '../../shared/store.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { downloadText, isImage, isText, readText } from './files.js';
@@ -73,6 +74,23 @@ export async function addToInbox({ kind, title, text }) {
   return doc;
 }
 
+// Adds an "Open in Google Docs" link to a row once its document has
+// synced. Looked up after the row is drawn so the drawer never waits on
+// storage to appear.
+function addDocLink(head, doc) {
+  getSyncMeta('documents', doc.id).then((meta) => {
+    if (!meta?.docUrl || head.querySelector('.doc-link')) return;
+    const link = document.createElement('a');
+    link.className = 'doc-link';
+    link.href = meta.docUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'Doc ↗';
+    link.title = 'Open in Google Docs';
+    head.appendChild(link);
+  });
+}
+
 function inboxRow(doc) {
   const row = document.createElement('div');
   row.className = 'box-row';
@@ -84,6 +102,7 @@ function inboxRow(doc) {
   title.className = 'box-title';
   title.textContent = doc.title;
   head.appendChild(title);
+  addDocLink(head, doc);
 
   const meta = document.createElement('span');
   meta.className = 'box-meta';
@@ -263,6 +282,7 @@ function reportRow(doc) {
   meta.className = 'box-meta';
   meta.textContent = new Date(doc.createdAt).toLocaleString();
   head.appendChild(meta);
+  addDocLink(head, doc);
 
   row.appendChild(head);
 

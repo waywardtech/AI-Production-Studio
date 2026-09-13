@@ -82,7 +82,8 @@ console.log('\n--- change notifications ---');
   eq([events.at(-1).kind, events.at(-1).name, events.at(-1).self], ['setting', 'app', true], 'settings changes are reported');
 
   await store.setSyncMeta('prompts', 'n1', { docId: 'abc' });
-  eq(events.at(-1).kind, 'setting', 'sync bookkeeping writes are not reported to pages');
+  eq([events.at(-1).kind, events.at(-1).collection, events.at(-1).record.docId], ['sync', 'prompts', 'abc'],
+    'sync bookkeeping is reported as its own kind, never as a record edit');
   stop();
 }
 

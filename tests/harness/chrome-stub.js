@@ -53,8 +53,23 @@
       session: area(mem.session, 'session'),
       onChanged: { addListener: (fn) => listeners.push(fn), removeListener() {} },
     },
+    identity: {
+      getRedirectURL: () => 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/',
+      // Simulates Google's consent redirect. Tests read __authRequests to
+      // see what was asked for, and can set __authResult to fail it.
+      async launchWebAuthFlow({ url, interactive }) {
+        window.__authRequests = window.__authRequests || [];
+        window.__authRequests.push({ url, interactive });
+        if (window.__authResult === 'deny') throw new Error('The user did not approve access.');
+        const scopes = new URL(url).searchParams.get('scope');
+        return `https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/#access_token=fake-token&expires_in=3599&token_type=Bearer&scope=${encodeURIComponent(scopes)}`;
+      },
+    },
     runtime: {
+      id: 'abcdefghijklmnopabcdefghijklmnop',
       getURL: (p) => `${location.origin}/${p}`,
+      getManifest: () => ({ version: '0.9.0-harness' }),
+      openOptionsPage: () => { window.__optionsOpened = (window.__optionsOpened || 0) + 1; },
       async sendMessage(msg) {
         const tab = window.__tabs[msg.tabId];
         switch (msg.type) {
@@ -75,6 +90,9 @@
             return { success: false, reason: 'none' };
           case 'EDGE_STUDIO_CAPTURE_USAGE':
             return { success: false, reason: 'none' };
+          case 'EDGE_STUDIO_SYNC_NOW':
+            window.__syncRequests = (window.__syncRequests || 0) + 1;
+            return { pushed: 0, pulled: 0, readBack: 0, trashed: 0, created: 0, errors: [] };
           default:
             return undefined;
         }

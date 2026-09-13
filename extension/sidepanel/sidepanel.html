@@ -9,11 +9,15 @@
   <header class="app-header">
     <div class="brand-row">
       <h1>Edge Studio</h1>
-      <button id="open-studio-btn" class="link-btn" title="Open the production studio in a full window">Studio ↗</button>
+      <div class="header-links">
+        <button id="open-studio-btn" class="link-btn" title="Open the production studio in a full window">Studio ↗</button>
+        <button id="open-settings-btn" class="link-btn" title="Settings — Google Docs, backup">⚙</button>
+      </div>
     </div>
     <!-- Filled by shared/project-bar.js. Everything below belongs to
          the project chosen here, in this panel and in the studio. -->
     <div id="project-bar"></div>
+    <button id="sync-status" class="sync-status"></button>
   </header>
 
   <!-- Chat tabs sit outside the Prompts/Replies tabs because both need

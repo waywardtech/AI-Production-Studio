@@ -45,6 +45,11 @@ body.studio {
   min-width: 260px;
 }
 
+.brand .sync-status {
+  margin: 0;
+  text-align: left;
+}
+
 .header-controls {
   display: flex;
   align-items: flex-end;
