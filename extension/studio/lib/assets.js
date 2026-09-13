@@ -9,8 +9,8 @@ import { state, activeProduction, activeScene } from './state.js';
 import { persist } from './repository.js';
 import { render } from './render.js';
 import { ASSET_CATEGORIES, categoryLabel, newAsset, touch } from './model.js';
-import { openModal } from '../../sidepanel/lib/modal.js';
-import { showToast } from '../../sidepanel/lib/ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast } from '../../shared/ui.js';
 import { isImage, fileRef, makeThumbnail } from './files.js';
 
 const gridEl = document.getElementById('asset-grid');

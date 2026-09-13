@@ -2,8 +2,8 @@
 
 import { state } from './state.js';
 import { getLibrary, saveLibrary } from './storage.js';
-import { openModal } from './modal.js';
-import { showToast, switchTab } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, switchTab } from '../../shared/ui.js';
 import { loadBlocksIntoBuilder } from './builder.js';
 
 const libraryListEl = document.getElementById('library-list');

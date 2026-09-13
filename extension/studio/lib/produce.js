@@ -12,9 +12,9 @@ import { render } from './render.js';
 import { newId, touch } from './model.js';
 import { assemblePrompt, buildProductionPrompt, profileById, targetById } from './prompt.js';
 import { refreshChatTabs } from './seed.js';
-import { openModal } from '../../sidepanel/lib/modal.js';
-import { showToast, copyToClipboard } from '../../sidepanel/lib/ui.js';
-import { runRoundTrip, sendToTab, unfence } from '../../sidepanel/lib/roundtrip.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, copyToClipboard } from '../../shared/ui.js';
+import { runRoundTrip, sendToTab, unfence } from '../../shared/roundtrip.js';
 
 function tabName(tab) {
   return `${tab.platformLabel} — ${tab.title || `tab ${tab.id}`}`;

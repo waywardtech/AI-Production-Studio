@@ -2,8 +2,8 @@
 
 import { state } from './state.js';
 import { getResponses, saveResponses } from './storage.js';
-import { openModal } from './modal.js';
-import { showToast, copyToClipboard, selectedTextOf } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, copyToClipboard, selectedTextOf } from '../../shared/ui.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
 import { appendTextToBuilder, startPromptFrom } from './builder.js';
 

@@ -2,8 +2,8 @@
 
 import { state, newBlockId } from './state.js';
 import { blockLabel, defaultBlockTypeId } from './blocks.js';
-import { openModal } from './modal.js';
-import { showToast, switchTab } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, switchTab } from '../../shared/ui.js';
 import { updateCostEstimate } from './usage.js';
 
 const canvasEl = document.getElementById('canvas');

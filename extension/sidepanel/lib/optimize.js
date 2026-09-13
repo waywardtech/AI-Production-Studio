@@ -6,9 +6,9 @@
 // him to approve, edit or discard.
 
 import { state } from './state.js';
-import { openModal } from './modal.js';
-import { showToast, copyToClipboard } from './ui.js';
-import { runRoundTrip, unfence } from './roundtrip.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, copyToClipboard } from '../../shared/ui.js';
+import { runRoundTrip, unfence } from '../../shared/roundtrip.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
 import { assembledPrompt, setBuilderTo } from './builder.js';
 

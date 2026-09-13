@@ -21,8 +21,8 @@
 //   produce.js     produce → out-box, and the dailies report
 //   boxes.js       the in-box/out-box drawer and the review loop
 //
-// It shares the side panel's modal, toast and chat round-trip rather
-// than growing a second copy of each — same extension, same behaviour.
+// The dialog, toasts and chat round trip come from ../shared/, the same
+// modules the side panel uses — one copy of each, one behaviour.
 
 import { loadProductions } from './lib/repository.js';
 import { registerRenderer, renderAll } from './lib/render.js';

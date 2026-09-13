@@ -15,16 +15,16 @@ full window with a scene rail and the three columns — assets, running
 order, shot builder — that compose clip prompts for Sora and Veo. See
 [The production workspace](#the-production-workspace-module-4) below.
 
-The extension is named **Edge Studio**; the directory keeps its
-`module-1-prompt-composer` name because that's how the spec and ticket
-docs refer to this module.
+The extension is named **Edge Studio** and lives in `extension/`. It
+used to sit in `modules/module-1-prompt-composer`, a name that stopped
+being true once it held Modules 1, 2 and 4.
 
 ## Install (unpacked, Chrome only)
 
 1. Open `chrome://extensions`
 2. Turn on **Developer mode** (top right)
 3. Click **Load unpacked**
-4. Select this `modules/module-1-prompt-composer` folder
+4. Select the repo's `extension/` folder
 5. Click the extension's toolbar icon to open the side panel
 6. Open a ChatGPT, Claude or Gemini tab, click **Refresh** under Chat
    tabs, tick the tab, build a prompt on the **Prompts** tab, and click
@@ -290,17 +290,21 @@ stay where they are; Drive becomes the canonical home when CORE-4 lands.
 
 ## Code layout
 
-The side panel is an ES module graph, one module per concern:
+Both pages are ES module graphs, one module per concern, with anything
+they have in common in `shared/`:
 
 ```
+shared/
+  modal.js            the one dialog both pages use
+  ui.js               toasts, tab switching, clipboard, selection
+  roundtrip.js        one trip through an open chat tab: send, wait, read
+  variables.js        <placeholder> logic — pure, no DOM, no chrome APIs
+
 sidepanel/
   sidepanel.js        entry — wires the modules together and starts them
   lib/
     state.js          shared mutable panel state
     storage.js        every chrome.storage read/write — the CORE-4 seam
-    variables.js      <placeholder> logic — pure, no DOM, no chrome APIs
-    modal.js          the panel's one dialog
-    ui.js             toasts, Prompts/Replies switching, clipboard
     blocks.js         block types: the palette and the Manage editor
     builder.js        the canvas, and everything that puts text into it
     library.js        saved prompts, tags and grouping
@@ -309,7 +313,6 @@ sidepanel/
     optimize.js       the platform-targeted rewrite loop
     replies.js        capture, save, and reuse
     usage.js          the Usage tab and the composer's cost meter
-    roundtrip.js      one trip through an open chat tab — shared
 
 studio/
   studio.html         the production workspace page
@@ -338,9 +341,11 @@ keystroke. `storage.js` and `studio/lib/repository.js` are the only
 places that talk to `chrome.storage`, which is what makes the Drive swap
 below a contained change rather than a sweep.
 
-The workspace imports the panel's `modal.js`, `ui.js` and `roundtrip.js`
-directly instead of copying them. One dialog implementation, one toast,
-one send-and-scrape loop — a fix to any of them lands in both surfaces.
+Neither page imports the other's code: what they share is in `shared/`.
+One dialog implementation, one toast, one send-and-scrape loop — a fix to
+any of them lands in both surfaces.
+
+Tests live at the repo root in `tests/` and run with `npm test`.
 
 ## What's stubbed and why (CORE-1 / CORE-4)
 

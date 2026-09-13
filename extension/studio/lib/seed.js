@@ -5,7 +5,7 @@
 // request into a chat Dan already has open, waits for the answer and
 // reads it back — the same hand-off rule Optimize follows (spec
 // decisions #2 and #4), which is why they all share
-// sidepanel/lib/roundtrip.js.
+// shared/roundtrip.js.
 //
 // The rule that makes iterating safe: an expansion pass may only touch
 // blanks (decision #13). Refine is the exception, because changing
@@ -28,9 +28,9 @@ import {
   targetById,
 } from './prompt.js';
 import { addAssets } from './assets.js';
-import { openModal } from '../../sidepanel/lib/modal.js';
-import { showToast } from '../../sidepanel/lib/ui.js';
-import { listChatTabs, runRoundTrip } from '../../sidepanel/lib/roundtrip.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast } from '../../shared/ui.js';
+import { listChatTabs, runRoundTrip } from '../../shared/roundtrip.js';
 
 export async function refreshChatTabs() {
   state.chatTabs = await listChatTabs();

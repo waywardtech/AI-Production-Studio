@@ -2,10 +2,10 @@
 // form that runs first (M1-11).
 
 import { state } from './state.js';
-import { extractVariableNames, applyVariableValues, unescapeAngleBrackets } from './variables.js';
+import { extractVariableNames, applyVariableValues, unescapeAngleBrackets } from '../../shared/variables.js';
 import { getRememberedValues, saveRememberedValues } from './storage.js';
-import { openModal } from './modal.js';
-import { showToast, copyToClipboard } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { assembledPrompt } from './builder.js';
 
 // Last-used values are remembered per variable name and prefilled the

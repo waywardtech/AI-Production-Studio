@@ -3,8 +3,8 @@
 
 import { state } from './state.js';
 import { getStoredBlockTypes, saveBlockTypes } from './storage.js';
-import { openModal } from './modal.js';
-import { showToast } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast } from '../../shared/ui.js';
 
 // Seeded on first run; editable from Blocks → Manage after that.
 export const DEFAULT_BLOCK_TYPES = [

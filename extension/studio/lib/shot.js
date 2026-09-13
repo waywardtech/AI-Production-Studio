@@ -12,7 +12,7 @@ import { persist } from './repository.js';
 import { render } from './render.js';
 import { ASPECTS, touch } from './model.js';
 import { assembleSegments, segmentText, profileById, releaseFromProfile } from './prompt.js';
-import { copyToClipboard, showToast } from '../../sidepanel/lib/ui.js';
+import { copyToClipboard, showToast } from '../../shared/ui.js';
 
 const stillEl = document.getElementById('still-slot');
 const aspectListEl = document.getElementById('aspect-list');

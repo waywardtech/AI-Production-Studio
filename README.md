@@ -14,14 +14,13 @@ docs/
   tickets-phase-0-2.md                          — Engineering tickets, Phases 0–2
   tickets-phase-4.md                            — Engineering tickets, Phase 4 (Module 4)
 
-modules/
-  module-1-prompt-composer/                     — Chrome extension (Modules 1, 2 and 4)
+extension/                                      — the Chrome extension (Modules 1, 2 and 4)
+tests/                                          — `npm test`; browser harness in tests/harness
 ```
 
 ## Status
 
-The extension is named **Edge Studio**. Its directory keeps the
-`module-1-prompt-composer` name the spec and ticket docs use.
+The extension is named **Edge Studio**.
 
 The panel has three tabs — **Prompts**, **Replies** and **Usage** — over
 a shared list of open chat tabs, and **Production ↗** opens the Module 4
@@ -40,7 +39,7 @@ any tracked tab on any of the three platforms, save it with a link back to its s
 part of it into a new prompt. Drive-backed export (M2-4/M2-5) and the
 reformat pipeline (M2-6) are still open.
 
-See `modules/module-1-prompt-composer/README.md` for install steps and a
+See `extension/README.md` for install steps and a
 ticket-by-ticket status table.
 
 **Core — Usage tracking (CORE-8/CORE-9)** — built: per-service

@@ -8,8 +8,8 @@ import { state, activeProduction, activeScene } from './state.js';
 import { persist, persistNow } from './repository.js';
 import { render, renderAll } from './render.js';
 import { STATUSES, duplicateScene, newId, newProduction, newScene, touch } from './model.js';
-import { openModal } from '../../sidepanel/lib/modal.js';
-import { showToast } from '../../sidepanel/lib/ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast } from '../../shared/ui.js';
 import { JOB_PROFILES, VIDEO_TARGETS, applyProfileDefaults, profileById } from './prompt.js';
 
 const sceneListEl = document.getElementById('scene-list');

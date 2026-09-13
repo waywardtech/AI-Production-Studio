@@ -17,8 +17,8 @@
 
 import { state } from './state.js';
 import { getUsage, saveUsage } from './storage.js';
-import { openModal } from './modal.js';
-import { showToast } from './ui.js';
+import { openModal } from '../../shared/modal.js';
+import { showToast } from '../../shared/ui.js';
 import { tabDisplayName } from './targets.js';
 
 const usageListEl = document.getElementById('usage-list');

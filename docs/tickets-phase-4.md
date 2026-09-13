@@ -119,7 +119,7 @@ A single sheet of the stills across a sequence, for review at a glance.
 
 **CORE-10 — Shared chat round trip** ✅ *Implemented*
 The send-to-tab → wait → scrape loop that Optimize (M1.5-2) introduced, extracted so Module 4's expansion, refine, breakdown, import and produce steps all use one implementation.
-*Built as:* `sidepanel/lib/roundtrip.js`. `optimize.js` now calls it rather than carrying its own poller, so a fix to streaming detection lands in both surfaces at once.
+*Built as:* `extension/shared/roundtrip.js` (originally `sidepanel/lib/roundtrip.js`, before the shared modules were given their own folder). `optimize.js` now calls it rather than carrying its own poller, so a fix to streaming detection lands in both surfaces at once.
 
 ---
 

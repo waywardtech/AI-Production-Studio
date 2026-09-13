@@ -5,9 +5,6 @@
 //
 //   state.js      shared mutable panel state
 //   storage.js    every chrome.storage read/write (the CORE-4 seam)
-//   variables.js  <placeholder> logic — pure, no DOM, no chrome
-//   modal.js      the panel's one dialog
-//   ui.js         toasts, Prompts/Replies switching, clipboard
 //   blocks.js     block types: palette and the Manage editor
 //   builder.js    the canvas, and everything that puts text into it
 //   library.js    saved prompts, tags and grouping
@@ -16,14 +13,15 @@
 //   optimize.js   the platform-targeted rewrite loop
 //   replies.js    capture, save, and reuse
 //   usage.js      the Usage tab and the composer's cost meter
-//   roundtrip.js  one trip through an open chat tab, shared with the
-//                 production workspace
+//
+// Modules the studio uses too — the dialog, toasts, the chat round trip
+// and <placeholder> parsing — live in ../shared/.
 //
 // The panel has three tabs — Prompts, Replies and Usage — over a shared
 // Chat tabs list, because Prompts and Replies act on the same ticked
 // tabs and duplicating that list would let the two drift apart.
 
-import { initTabs } from './lib/ui.js';
+import { initTabs } from '../shared/ui.js';
 import { loadBlockTypes, renderPalette, openBlockManager } from './lib/blocks.js';
 import { renderCanvas, updatePreview, addBlock, initBuilder } from './lib/builder.js';
 import { renderLibrary, initLibrary } from './lib/library.js';
