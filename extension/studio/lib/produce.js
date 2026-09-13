@@ -16,16 +16,8 @@ import { refreshChatTabs } from './seed.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { runRoundTrip, sendToTab, unfence } from '../../shared/roundtrip.js';
+import { isChatTab, tabName } from '../../shared/tabs.js';
 
-function tabName(tab) {
-  return `${tab.platformLabel} — ${tab.title || `tab ${tab.id}`}`;
-}
-
-// Tabs that can hold a conversation, as opposed to generator-only pages
-// (Sora, Flow) that take a prompt but have no reply to read back.
-function isChatTab(tab) {
-  return tab.kind !== 'generator';
-}
 
 function scenesInScope(production, scope) {
   if (scope === 'all') return production.scenes;

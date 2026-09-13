@@ -9,7 +9,7 @@ import { state } from './state.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { runRoundTrip, unfence } from '../../shared/roundtrip.js';
-import { tabDisplayName, tabPlatform } from './targets.js';
+import { tabDisplayName, tabPickerName, tabPlatform } from './targets.js';
 import { assembledPrompt, setBuilderTo } from './builder.js';
 
 // Per-platform guidance. Deliberately says "markdown headings" rather
@@ -128,7 +128,7 @@ async function runOptimize() {
         value: defaultWorkerId,
         options: chatTabs.map((t) => ({
           value: String(t.id),
-          label: tabDisplayName(t.id),
+          label: tabPickerName(t.id),
         })),
       },
       {

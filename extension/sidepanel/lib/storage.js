@@ -47,21 +47,6 @@ export async function saveUsage(usage) {
 
 // ---------- tab labels (per browser session) ----------
 //
-// Tab labels live in storage.session, not storage.local, and that's
-// deliberate. They're keyed by Chrome tab ID, and tab IDs are only
-// unique within a single browser session — Chrome hands the same IDs
-// out again after a restart. Persisting them to storage.local meant a
-// label saved against tab 42 today would reappear on an unrelated tab
-// 42 tomorrow, quietly mislabelling a destination. storage.session is
-// cleared when the browser closes, which matches M1-6's "labels persist
-// per tab session" acceptance criterion exactly and makes the ID reuse
-// unreachable.
+// Kept in shared/tabs.js so the studio names tabs the same way.
 
-export async function getTabLabels() {
-  const { tabLabels } = await chrome.storage.session.get('tabLabels');
-  return tabLabels || {};
-}
-
-export async function saveTabLabels(tabLabels) {
-  await chrome.storage.session.set({ tabLabels });
-}
+export { getTabLabels, saveTabLabels } from '../../shared/tabs.js';

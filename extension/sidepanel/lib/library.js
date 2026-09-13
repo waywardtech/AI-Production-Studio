@@ -4,6 +4,7 @@
 import { state } from './state.js';
 import { listPrompts, savePrompt, deletePrompt as removePrompt } from './storage.js';
 import { getSyncMeta } from '../../shared/store.js';
+import { deletionNote } from '../../shared/sync-status.js';
 import { STATUSES, newPrompt, parseTags } from '../../shared/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, switchTab } from '../../shared/ui.js';
@@ -87,7 +88,7 @@ async function deletePrompt(item) {
   // it with Drive, so a stray click here is unrecoverable.
   const confirmed = await openModal({
     title: 'Delete prompt',
-    body: `Delete "${item.title}"? This can't be undone.`,
+    body: `Delete "${item.title}"? ${await deletionNote()}`,
     confirmLabel: 'Delete',
     danger: true,
   });
@@ -222,7 +223,7 @@ export async function renderLibrary() {
   libraryListEl.innerHTML = '';
 
   if (visible.length === 0) {
-    appendEmpty(library.length === 0 ? `No saved prompts in ${state.projectName} yet.` : 'No matches.');
+    appendEmpty(library.length === 0 ? `No saved prompts in ${state.projectName} yet — build one above and press Save.` : 'No matches.');
     return;
   }
 

@@ -36,6 +36,7 @@
       <button id="inbox-btn" class="secondary compact">In-box <span id="inbox-count" class="pill">0</span></button>
       <button id="outbox-btn" class="secondary compact">Out-box <span id="outbox-count" class="pill">0</span></button>
       <button id="produce-btn" class="compact">Produce</button>
+      <button id="open-composer-btn" class="link-btn" title="Open the prompt composer beside this window">Composer</button>
       <button id="open-settings-btn" class="link-btn" title="Settings — Google Docs, backup">⚙</button>
     </div>
   </header>
@@ -122,7 +123,10 @@
 
       <div class="section-head">
         <h2>Preview</h2>
-        <button id="copy-prompt-btn" class="link-btn">Copy</button>
+        <div class="section-actions">
+          <button id="save-shot-prompt-btn" class="link-btn" title="Keep this shot as a reusable prompt in the project">Save to prompts</button>
+          <button id="copy-prompt-btn" class="link-btn">Copy</button>
+        </div>
       </div>
       <div id="prompt-preview" class="prompt-preview"></div>
     </section>

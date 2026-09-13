@@ -914,3 +914,39 @@ button.danger {
 .doc-link:hover {
   text-decoration: underline;
 }
+
+/* ---------- Getting started ---------- */
+
+.getting-started {
+  border: 1px solid #3a4580;
+  background: #1b1f33;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 10px 0 4px;
+}
+
+.getting-started.hidden {
+  display: none;
+}
+
+.getting-started h2 {
+  margin: 0;
+  color: #c7cffb;
+}
+
+.getting-started ol {
+  margin: 6px 0 2px;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #c3c5cd;
+}
+
+.getting-started li {
+  margin: 3px 0;
+}
+
+.getting-started em {
+  font-style: normal;
+  color: #e7e7ea;
+}

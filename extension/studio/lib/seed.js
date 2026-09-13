@@ -30,15 +30,12 @@ import {
 import { addAssets } from './assets.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast } from '../../shared/ui.js';
-import { listChatTabs, runRoundTrip } from '../../shared/roundtrip.js';
+import { runRoundTrip } from '../../shared/roundtrip.js';
+import { isChatTab, listChatTabs, tabName } from '../../shared/tabs.js';
 
 export async function refreshChatTabs() {
   state.chatTabs = await listChatTabs();
   return state.chatTabs;
-}
-
-function tabName(tab) {
-  return `${tab.platformLabel} — ${tab.title || `tab ${tab.id}`}`;
 }
 
 // Which open chat does the thinking. Defaults to a tab on the same
@@ -54,7 +51,7 @@ async function chooseWorkerTab(title, hint) {
 
   // Generator-only pages (Sora, Flow) take a prompt but have no reply to
   // read back, so they can't do this kind of work.
-  const chatTabs = state.chatTabs.filter((t) => t.kind !== 'generator');
+  const chatTabs = state.chatTabs.filter(isChatTab);
   if (chatTabs.length === 0) {
     showToast('This needs a ChatGPT, Claude or Gemini chat open — generator pages can’t answer.', 'warning');
     return null;

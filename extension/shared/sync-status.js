@@ -38,6 +38,15 @@ export function describeSyncState(google = {}) {
   }
 }
 
+// What deleting something with a Google Doc actually does, in one
+// sentence for every delete dialog: with Google connected the Doc goes
+// to Drive's trash and can be restored; without it, it's gone.
+export async function deletionNote({ hasDoc = true } = {}) {
+  const google = (await getSetting('google', {})) || {};
+  if (google.connected && hasDoc) return 'Its Google Doc moves to your Drive trash, where it can be restored.';
+  return "This can't be undone.";
+}
+
 export async function mountSyncStatus(button) {
   button.classList.add('sync-status');
 

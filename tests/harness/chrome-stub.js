@@ -99,7 +99,8 @@
       },
     },
     tabs: { async query() { return []; }, async create() {}, async update() {} },
-    windows: { async update() {} },
+    windows: { async update() {}, async getCurrent() { return { id: 1 }; } },
+    sidePanel: { async open(opts) { window.__sidePanelOpened = opts; } },
   };
 
   // Clipboard writes are recorded rather than performed.

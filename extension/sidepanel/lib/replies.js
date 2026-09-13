@@ -2,8 +2,11 @@
 
 import { state } from './state.js';
 import { listReplies, saveReply, deleteReply } from './storage.js';
-import { newReply } from '../../shared/model.js';
-import { getSyncMeta } from '../../shared/store.js';
+import { STATUSES, newReply, parseTags } from '../../shared/model.js';
+import { deletionNote } from '../../shared/sync-status.js';
+import { getSetting, getSyncMeta, list, put } from '../../shared/store.js';
+import { newDocument } from '../../shared/model.js';
+import { newProduction } from '../../studio/lib/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard, selectedTextOf } from '../../shared/ui.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
@@ -149,7 +152,10 @@ async function saveCapture(capture) {
   const suggested = `${capture.label} — ${new Date(capture.capturedAt).toLocaleDateString()}`;
   const result = await openModal({
     title: 'Save reply',
-    fields: [{ name: 'title', label: 'Name this reply', value: suggested }],
+    fields: [
+      { name: 'title', label: 'Name this reply', value: suggested },
+      { name: 'tags', label: 'Tags (comma separated)', value: '' },
+    ],
     confirmLabel: 'Save',
   });
   if (result === null) return;
@@ -165,6 +171,7 @@ async function saveCapture(capture) {
       projectId: state.projectId,
       title,
       text,
+      tags: parseTags(result.tags),
       source: {
         platform: capture.platform || 'ChatGPT',
         tabLabel: capture.label,
@@ -198,6 +205,73 @@ export function toMarkdown(item) {
     .join('\n');
 }
 
+// A reply is often the raw material for a production — a script, a
+// treatment, a scene list. This drops it (or the highlighted part) into
+// the in-box of the production the studio has open in this project, so
+// it's one click from "Break into shots".
+async function sendToStudioInbox(item, text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) {
+    showToast('Nothing to send — that reply is empty.', 'warning');
+    return;
+  }
+
+  const productions = (await list('productions', { projectId: state.projectId })).sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+  const app = (await getSetting('app', {})) || {};
+  let production = productions.find((p) => p.id === app.activeProductionId) || productions[0];
+  if (!production) {
+    production = newProduction({ projectId: state.projectId, name: 'First production' });
+    await put('productions', production);
+  }
+
+  const partial = trimmed.length < (item.text || '').trim().length;
+  await put(
+    'documents',
+    newDocument({
+      projectId: state.projectId,
+      productionId: production.id,
+      box: 'inbox',
+      kind: 'note',
+      title: partial ? `${item.title} (excerpt)` : item.title,
+      text: trimmed,
+    })
+  );
+  showToast(`In the in-box of "${production.name}" — open the Studio ↗ to break it into shots.`);
+}
+
+async function editReplyMeta(item) {
+  const result = await openModal({
+    title: 'Edit reply',
+    fields: [
+      { name: 'title', label: 'Name', value: item.title },
+      { name: 'tags', label: 'Tags (comma separated)', value: (item.tags || []).join(', ') },
+      {
+        name: 'status',
+        label: 'Status',
+        type: 'select',
+        value: item.status || 'Draft',
+        options: STATUSES.map((s) => ({ value: s, label: s })),
+      },
+    ],
+    confirmLabel: 'Save',
+  });
+  if (result === null) return;
+
+  const title = result.title.trim();
+  if (!title) {
+    showToast('A reply needs a name.', 'warning');
+    return;
+  }
+  item.title = title;
+  item.tags = parseTags(result.tags);
+  item.status = result.status;
+  await saveReply(item);
+  showToast(`Updated "${title}".`);
+  await renderResponses();
+}
+
 export async function renderResponses() {
   const responses = await listReplies(state.projectId);
   const q = responseFilterEl.value.trim().toLowerCase();
@@ -206,6 +280,8 @@ export async function renderResponses() {
         (item) =>
           item.title.toLowerCase().includes(q) ||
           item.text.toLowerCase().includes(q) ||
+          (item.status || '').toLowerCase().includes(q) ||
+          (item.tags || []).some((t) => t.includes(q)) ||
           (item.source?.tabLabel || '').toLowerCase().includes(q)
       )
     : responses;
@@ -219,7 +295,7 @@ export async function renderResponses() {
   if (filtered.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'empty-state';
-    empty.textContent = q ? 'No matches.' : `No saved replies in ${state.projectName} yet.`;
+    empty.textContent = q ? 'No matches.' : `No saved replies in ${state.projectName} yet — capture one above and press Save.`;
     responseListEl.appendChild(empty);
     return;
   }
@@ -241,6 +317,14 @@ export async function renderResponses() {
     status.textContent = item.status || 'Draft';
     head.appendChild(status);
 
+    // Same controls a saved prompt has: rename, tag, set status.
+    const edit = document.createElement('span');
+    edit.className = 'row-action';
+    edit.textContent = '✎';
+    edit.title = 'Edit name, tags and status';
+    edit.addEventListener('click', () => editReplyMeta(item));
+    head.appendChild(edit);
+
     const syncMeta = metas.get(item.id);
     if (syncMeta?.docUrl) {
       const doc = document.createElement('a');
@@ -254,6 +338,23 @@ export async function renderResponses() {
     }
 
     li.appendChild(head);
+
+    if ((item.tags || []).length) {
+      const tagRow = document.createElement('div');
+      tagRow.className = 'tag-row';
+      item.tags.forEach((tag) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.textContent = tag;
+        chip.title = `Show replies tagged "${tag}"`;
+        chip.addEventListener('click', () => {
+          responseFilterEl.value = tag;
+          renderResponses();
+        });
+        tagRow.appendChild(chip);
+      });
+      li.appendChild(tagRow);
+    }
 
     const meta = document.createElement('div');
     meta.className = 'response-meta';
@@ -287,6 +388,13 @@ export async function renderResponses() {
     newPrompt.addEventListener('click', () => startPromptFrom(selectedTextOf(body)));
     row.appendChild(newPrompt);
 
+    const toStudio = document.createElement('button');
+    toStudio.className = 'secondary';
+    toStudio.textContent = 'To studio';
+    toStudio.title = "Put the highlighted text (or all of it) in the studio's in-box, ready to break into shots";
+    toStudio.addEventListener('click', () => sendToStudioInbox(item, selectedTextOf(body)));
+    row.appendChild(toStudio);
+
     // M2-7, minimal form: Markdown to the clipboard. Writing an actual
     // .md file belongs with the Drive work in CORE-4/M2-5.
     const copy = document.createElement('button');
@@ -307,7 +415,7 @@ export async function renderResponses() {
     del.addEventListener('click', async () => {
       const confirmed = await openModal({
         title: 'Delete reply',
-        body: `Delete "${item.title}"? This can't be undone.`,
+        body: `Delete "${item.title}"? ${await deletionNote()}`,
         confirmLabel: 'Delete',
         danger: true,
       });

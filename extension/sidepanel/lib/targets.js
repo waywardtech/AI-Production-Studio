@@ -6,6 +6,7 @@
 import { state } from './state.js';
 import { getTabLabels, saveTabLabels } from './storage.js';
 import { updateCostEstimate } from './usage.js';
+import { tabName, tabShortName } from '../../shared/tabs.js';
 
 const tabListEl = document.getElementById('tab-list');
 
@@ -13,7 +14,16 @@ const tabListEl = document.getElementById('tab-list');
 // tab the same thing, so they all resolve its name here.
 export function tabDisplayName(tabId) {
   const tab = state.detectedTabs.find((t) => t.id === tabId);
-  return state.tabLabels[tabId] || tab?.title || `Tab ${tabId}`;
+  if (!tab) return state.tabLabels[tabId] || `Tab ${tabId}`;
+  return tabShortName({ ...tab, label: state.tabLabels[tabId] || null });
+}
+
+// The same tab as named in a picker, where the platform isn't shown
+// alongside: "ChatGPT · Client X". Identical to the studio's pickers.
+export function tabPickerName(tabId) {
+  const tab = state.detectedTabs.find((t) => t.id === tabId);
+  if (!tab) return `Tab ${tabId}`;
+  return tabName({ ...tab, label: state.tabLabels[tabId] || null });
 }
 
 export function tabPlatform(tabId) {

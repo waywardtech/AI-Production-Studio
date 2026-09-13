@@ -14,9 +14,9 @@ const POLL_MS = 2000;
 // Two unchanged polls before the answer counts as finished.
 const STABLE_TICKS = 2;
 
-export async function listChatTabs() {
-  return (await chrome.runtime.sendMessage({ type: 'EDGE_STUDIO_GET_TABS' })) || [];
-}
+// Tabs come with their session labels from shared/tabs.js, so a picker
+// here names a tab exactly as the side panel does.
+export { listChatTabs } from './tabs.js';
 
 export async function captureFromTab(tabId) {
   const result = await chrome.runtime.sendMessage({

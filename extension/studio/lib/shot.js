@@ -13,6 +13,8 @@ import { render } from './render.js';
 import { ASPECTS, touch } from './model.js';
 import { assembleSegments, segmentText, profileById, releaseFromProfile } from './prompt.js';
 import { copyToClipboard, showToast } from '../../shared/ui.js';
+import { put } from '../../shared/store.js';
+import { newPrompt } from '../../shared/model.js';
 
 const stillEl = document.getElementById('still-slot');
 const aspectListEl = document.getElementById('aspect-list');
@@ -201,6 +203,30 @@ export function initShot({ onRefine }) {
     }
     const ok = await copyToClipboard(text);
     showToast(ok ? 'Assembled shot copied.' : 'Could not copy.', ok ? 'success' : 'warning');
+  });
+
+  // A shot that works is worth keeping as a prompt: it lands in the
+  // project's Saved prompts in the composer, tagged "shot", where it can
+  // be inserted into any chat or used as the start of another.
+  document.getElementById('save-shot-prompt-btn').addEventListener('click', async () => {
+    const production = activeProduction();
+    const scene = activeScene();
+    const text = currentPromptText();
+    if (!scene || !text) {
+      showToast('Nothing to save yet — fill a block or an aspect.', 'warning');
+      return;
+    }
+    const title = `${scene.name} — ${production.name}`;
+    await put(
+      'prompts',
+      newPrompt({
+        projectId: state.projectId,
+        title,
+        blocks: [{ id: `ask-${Date.now()}`, type: 'ask', text }],
+        tags: ['shot'],
+      })
+    );
+    showToast(`Saved "${title}" to ${state.projectName}'s prompts, tagged "shot".`);
   });
 
   document.getElementById('clear-refine-log-btn').addEventListener('click', () => {

@@ -23,6 +23,7 @@ import { touch } from './model.js';
 import { targetById } from './prompt.js';
 import { newDocument } from '../../shared/model.js';
 import { getSyncMeta } from '../../shared/store.js';
+import { deletionNote } from '../../shared/sync-status.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { downloadText, isImage, isText, readText } from './files.js';
@@ -143,7 +144,7 @@ function inboxRow(doc) {
   remove.addEventListener('click', async () => {
     const confirmed = await openModal({
       title: `Remove "${doc.title}"?`,
-      body: 'It comes out of the in-box. With Google Docs connected, its Doc goes to your Drive trash.',
+      body: `It comes out of the in-box. ${await deletionNote()}`,
       confirmLabel: 'Remove',
       danger: true,
     });
@@ -316,7 +317,7 @@ function reportRow(doc) {
   remove.addEventListener('click', async () => {
     const confirmed = await openModal({
       title: `Remove "${doc.title}"?`,
-      body: 'The report comes out of the out-box. With Google Docs connected, its Doc goes to your Drive trash.',
+      body: `The report comes out of the out-box. ${await deletionNote()}`,
       confirmLabel: 'Remove',
       danger: true,
     });

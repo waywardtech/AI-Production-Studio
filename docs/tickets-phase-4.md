@@ -16,13 +16,13 @@ come from.
 **M4-1 — Production workspace scaffold** ✅ *Implemented*
 A full-window extension page (spec decision #11) reachable from the side panel, sharing the panel's stylesheet, modal, toast and chat round-trip rather than growing a second copy of each.
 *Acceptance:* The page opens from the panel, focuses an existing workspace tab instead of opening a second one, and renders the scene rail plus three columns.
-*Built as:* `studio/studio.html` + `studio/lib/*`, opened by **Production ↗** in the panel header. The side panel's `modal.js`, `ui.js` and the new `roundtrip.js` are imported directly, so both surfaces behave identically. Columns stack below 1100px rather than squeezing.
+*Built as:* `studio/studio.html` + `studio/lib/*`, opened by **Studio ↗** in the side panel header (and **Composer** in the studio opens the side panel back). Both pages use the same `shared/` modules — dialog, toasts, chat round trip, project bar, record store — so they behave identically. Columns stack below 1100px rather than squeezing.
 
 **M4-2 — Production / Scene / Shot data model** ✅ *Implemented*
 Define production → scenes → blocks / shot / renders, with sequences, an asset pool, and in-box/out-box, all behind the Core repository seam.
 *Depends on:* CORE-4 (for the Drive backing; the seam ships without it)
 *Acceptance:* CRUD works against the schema and every write goes through one module.
-*Built as:* `lib/model.js` holds the shapes and vocabularies; `lib/repository.js` is the single storage seam, coalescing writes so typing in a block doesn't hit storage per keystroke. Backed by `chrome.storage.local` (with `unlimitedStorage`, since thumbnails accumulate) until CORE-4 lands.
+*Built as:* `studio/lib/model.js` holds the shapes and vocabularies; `studio/lib/repository.js` reads and writes through the shared record store (`shared/store.js`), coalescing writes so typing in a block doesn't hit storage per keystroke. Productions, assets and in-box/out-box documents are separate records inside a project; the asset pool belongs to the project and is shared by all its productions (spec decision #17). Synced to Google Docs by Core once connected.
 
 **M4-3 — Scene rail: scenes, ordering, duplication, sequences** ✅ *Implemented*
 Create, rename, reorder, duplicate and delete scenes; bundle scenes into named sequences.
@@ -78,7 +78,7 @@ Paste or drop a script, a treatment or a comic page description and get an order
 **M4-13 — In-box and out-box** ✅ *Implemented*
 Per-production folders: scripts and assets in, produced clips and reports out.
 *Acceptance:* A dropped script is readable in the in-box and can be turned into scenes or imported as material; produced work is listed in the out-box.
-*Built as:* One drawer for both. Page-wide file drop: images go straight into the asset pool, text files into the in-box. Backed by the repository seam, so these become Drive folders when CORE-2/CORE-3 land.
+*Built as:* One drawer for both. Page-wide file drop: images go straight into the asset pool, text files into the in-box. Each production is a Drive folder with In-box and Out-box folders, and every in-box script or note and every filed report is a Google Doc in them. A saved reply can be sent straight to the in-box from the side panel (**To studio**).
 
 **M4-14 — Produce** ✅ *Implemented*
 Assemble → reword for the target → write into the generator's tab → record what was sent.
@@ -93,7 +93,7 @@ Keep / reject / regenerate per render, with notes, and a field for the clip's li
 **M4-16 — Dailies report** ✅ *Implemented*
 A Markdown summary of what was produced, from which prompt, with which verdict.
 *Acceptance:* Filed into the out-box, viewable and downloadable.
-*Built as:* Counts by verdict, sequences, every shot with its renders, prompts and links, and the references used. Downloads as `dailies-<production>-<date>.md`.
+*Built as:* Counts by verdict, sequences, every shot with its renders, prompts and links, and the references used. Filed as a document in the out-box (a Google Doc when connected) and downloadable as `dailies-<production>-<date>.md`.
 
 **M4-17 — Import existing material** ✅ *Implemented*
 Bring in characters, scenes, locations, action sequences, dialogue and mood/lighting that already exist.

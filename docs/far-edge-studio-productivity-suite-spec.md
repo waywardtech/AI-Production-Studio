@@ -101,6 +101,9 @@ Where a service doesn't expose usage data via an official API, this falls under 
 ### Decisions
 - **Folder structure:** Projects are the top-level physical structure in Drive; each project folder contains a data-type layout underneath. A lightweight tag layer (a few standard system tags plus user-created ones) sits on top for cross-cutting filtering. Atomic documents are stored as links/references rather than duplicated copies.
 - **Re-seed from transcript:** Doesn't call an LLM API directly — it formats the transcript into a ready-to-use prompt and hands it off for Dan to paste into whichever platform is already open.
+- **Google Docs as the document store:** Every document the suite keeps — a saved prompt, a saved reply, an in-box script or note, a dailies report — is a Google Doc in `Edge Studio/<Project>/…`, readable and editable in Google Docs. Edits made in Docs are read back; when both sides changed, the later edit wins. Structure a Doc can't carry faithfully (blocks, scenes, tags, links between records) lives in a small hidden index in Drive's app-data folder, which is also how a second computer catches up. Deleting moves Docs to Drive's trash, never destroys them.
+- **Access:** Two narrow, non-sensitive scopes — `drive.file` (only files the suite creates) and `drive.appdata` (its index) — via a Web-application OAuth client whose ID is pasted into Settings. No Google verification review is needed, and nothing outside the suite's own folder is ever visible to it.
+- **Projects are shared by every surface:** The active project is one setting that the side panel and the studio both follow, so switching project in either switches both.
 
 ---
 
@@ -341,7 +344,9 @@ The workspace is one full-window page (the side panel is too narrow for it), wit
 - **Generation stays hands-off:** the pipeline composes and hands off the prompt exactly as Optimize does; it never presses send in Dan's chat and never carries an API key.
 - **Expansion is additive:** a pass fills blanks and leaves written fields alone. Overwriting is an explicit choice, never a side effect of iterating.
 - **Priority generators:** Sora (Sora page or ChatGPT) and Veo (Flow or Gemini), matching the existing image-gen decision (#6). Generator pages take a prompt but have no reply to read, so rewording always runs in a separate chat.
-- **Storage:** productions live behind the same repository seam as everything else — local until CORE-4, Drive after, with no UI change. Dropped files are held as a reference plus a thumbnail rather than copied wholesale, consistent with the "links, not copies" rule (#1).
+- **Storage:** productions, assets and in-box/out-box documents are separate records in the same store as everything else, synced to Drive by Core — each production is a folder in its project with a generated shot list, an In-box and an Out-box. Dropped files are held as a reference plus a thumbnail rather than copied wholesale, consistent with the "links, not copies" rule (#1).
+- **Assets belong to the project, not the production:** a character, location or piece of wardrobe is reused across every production in a project, so the asset pool is shared by all of them.
+- **Produce waits between shots:** each shot is written into the generator's input box and the run pauses until Dan has sent it, because the next shot would replace it. Rewording for the generator runs in a separate chat, never the generator tab, so it doesn't spend generation quota.
 
 ---
 
@@ -369,7 +374,7 @@ The workspace is one full-window page (the side panel is too narrow for it), wit
 | **4** | Module 4: video & media production pipeline — three-column workspace, scene seed/expansion loop, produce + dailies, Sora and Veo profiles |
 | **5 (future)** | Multi-person handoff, native mobile app, Firefox parity, self-hosted generation |
 
-Module 4 is built against the same repository seam as everything before it, so it does not wait on Phase 0 — it runs on local storage until Core lands, exactly as Modules 1 and 2 do today.
+In practice Module 4 was built before Phase 0, against the same storage seam as Modules 1 and 2, and Core then landed underneath all three without changing their workflows.
 
 ---
 
@@ -409,9 +414,13 @@ Per the "don't reinvent the wheel" principle in §8, here's what's actually out 
 | 11 | Module 4 surface | A full-window extension page opened from the side panel, not a fourth panel tab — the three-column workspace needs the width |
 | 12 | Priority video generators | Sora (Sora page or ChatGPT) and Veo (Flow or Gemini), matching decision #6 |
 | 13 | Scene expansion behaviour | Additive — a pass fills blanks only; overwriting written fields is an explicit choice, never a side effect of iterating |
-| 14 | Module 4 storage | Same repository seam as the other modules: local until CORE-4, Drive after. Dropped files are held as a reference plus a thumbnail, per #1 |
+| 14 | Module 4 storage | Productions, assets and documents are records in the shared store, synced by Core. Dropped files are held as a reference plus a thumbnail, per #1 |
+| 15 | Document store | Google Docs — one Doc per prompt, reply, script/note and report, in `Edge Studio/<Project>/…`; two-way, later edit wins; structure in a hidden app-data index; deletions go to Drive trash |
+| 16 | Google access | `drive.file` + `drive.appdata` only, via a Web-application OAuth client ID entered in Settings |
+| 17 | Asset scope | Assets belong to the project and are shared by all its productions |
+| 18 | Produce pacing | One shot at a time, waiting for Dan to send each; rewording happens in a separate chat, never the generator tab |
 
-*No open questions remain. All decisions above are ready to build against.*
+*No open questions remain. Decisions 15–18 were made while building Core and reworking the suite for coherence; the extension README describes the result.*
 
 ---
 

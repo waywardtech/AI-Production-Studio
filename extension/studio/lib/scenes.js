@@ -11,6 +11,7 @@ import { STATUSES, duplicateScene, newId, newScene, touch } from './model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast } from '../../shared/ui.js';
 import { JOB_PROFILES, VIDEO_TARGETS, applyProfileDefaults, profileById } from './prompt.js';
+import { deletionNote } from '../../shared/sync-status.js';
 
 const sceneListEl = document.getElementById('scene-list');
 const sequenceListEl = document.getElementById('sequence-list');
@@ -347,7 +348,7 @@ async function renameProductionFlow() {
             title: `Delete "${production.name}"?`,
             body:
               `Its ${listed} ${verb} with it. The asset pool stays — it belongs to ${state.projectName}, ` +
-              'not this production. This cannot be undone.',
+              `not this production. ${(await deletionNote()).replace('Its Google Doc moves to your Drive trash, where it can be restored.', 'Its folder and Docs move to your Drive trash, where they can be restored.')}`,
             confirmLabel: 'Delete',
             danger: true,
           });

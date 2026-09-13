@@ -44,6 +44,22 @@
   <!-- ---------------- PROMPTS ---------------- -->
   <div id="tab-prompts" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-prompts">
 
+    <!-- Shown until dismissed. The whole workflow in four lines. -->
+    <section id="getting-started" class="getting-started hidden">
+      <div class="section-head">
+        <h2>How Edge Studio works</h2>
+        <button id="dismiss-start-btn" class="link-btn">Got it</button>
+      </div>
+      <ol>
+        <li><strong>Open a chat</strong> — ChatGPT, Claude or Gemini — then <em>Refresh</em> above and tick it.</li>
+        <li><strong>Build a prompt</strong>: click a block below, write, then <em>Insert</em> it into the chat.
+          <em>Save</em> keeps it in this project.</li>
+        <li><strong>Capture the answer</strong> on <em>Replies</em>. Scripts and scene lists go <em>To studio</em>,
+          where they become shots.</li>
+        <li><strong>Keep it all in Google Docs</strong> — connect in <em>⚙</em> Settings.</li>
+      </ol>
+    </section>
+
     <section id="palette">
       <div class="section-head">
         <h2>Blocks</h2>
@@ -71,7 +87,7 @@
     </section>
 
     <section id="library-section">
-      <h2>Library</h2>
+      <h2>Saved prompts</h2>
       <input id="filter-input" type="text" placeholder="Filter saved prompts..." />
       <div id="tag-filter-row" class="tag-filter-row"></div>
       <div id="library-list"></div>

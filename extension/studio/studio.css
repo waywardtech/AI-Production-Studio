@@ -765,3 +765,8 @@ body.studio .toast {
   right: 16px;
   max-width: 420px;
 }
+
+.section-actions {
+  display: inline-flex;
+  gap: 12px;
+}

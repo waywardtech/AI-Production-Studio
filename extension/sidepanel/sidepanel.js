@@ -32,7 +32,7 @@ import { renderCaptures, renderResponses, initReplies } from './lib/replies.js';
 import { loadUsage, renderUsage, updateCostEstimate, initUsage } from './lib/usage.js';
 import { state } from './lib/state.js';
 import { migrate } from '../shared/migrate.js';
-import { subscribe } from '../shared/store.js';
+import { getSetting, subscribe, updateSetting } from '../shared/store.js';
 import { mountProjectBar } from '../shared/project-bar.js';
 import { mountSyncStatus } from '../shared/sync-status.js';
 
@@ -78,7 +78,16 @@ function followStoreChanges() {
         if ((e.kind === 'record' || e.kind === 'sync') && e.collection === 'prompts') queued.add('library');
         if ((e.kind === 'record' || e.kind === 'sync') && e.collection === 'replies') queued.add('replies');
         if (e.kind === 'setting' && e.name === 'usage') queued.add('usage');
-        if (e.kind === 'setting' && e.name === 'app') queued.add('blocks');
+        // The app setting also changes when a page switches project or
+        // production; only a change to the block types needs a redraw
+        // (a redraw would take focus out of a block being typed in).
+        if (
+          e.kind === 'setting' &&
+          e.name === 'app' &&
+          JSON.stringify(e.record?.blockTypes || null) !== JSON.stringify(e.previous?.blockTypes || null)
+        ) {
+          queued.add('blocks');
+        }
       });
     if (!queued.size) return;
 
@@ -137,6 +146,14 @@ async function init() {
 
   followStoreChanges();
   await mountSyncStatus(document.getElementById('sync-status'));
+
+  const app = (await getSetting('app', {})) || {};
+  const guide = document.getElementById('getting-started');
+  if (!app.gettingStartedDismissed) guide.classList.remove('hidden');
+  document.getElementById('dismiss-start-btn').addEventListener('click', async () => {
+    guide.classList.add('hidden');
+    await updateSetting('app', { gettingStartedDismissed: true });
+  });
   await refreshTabs();
   updateCostEstimate();
 }

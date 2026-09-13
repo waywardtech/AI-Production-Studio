@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Edge Studio",
   "short_name": "Edge Studio",
-  "version": "0.9.0",
-  "description": "Prompt composer, reply manager and video production pipeline for ChatGPT, Claude and Gemini: block-based prompt building, one-click injection, platform-targeted optimization, reply capture, and a three-column scene builder that composes clip prompts for Sora and Veo.",
+  "version": "0.10.0",
+  "description": "Prompts for ChatGPT, Claude and Gemini; reply capture; Sora and Veo shot production. Organised by project, kept in Google Docs.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

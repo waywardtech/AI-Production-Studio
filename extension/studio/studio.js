@@ -38,6 +38,7 @@ import { migrate } from '../shared/migrate.js';
 import { subscribe } from '../shared/store.js';
 import { mountProjectBar } from '../shared/project-bar.js';
 import { mountSyncStatus } from '../shared/sync-status.js';
+import { showToast } from '../shared/ui.js';
 
 registerRenderer('scenes', renderScenes);
 registerRenderer('assets', renderAssets);
@@ -126,6 +127,18 @@ async function init() {
   followStoreChanges();
   await mountSyncStatus(document.getElementById('sync-status'));
   document.getElementById('open-settings-btn').addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+  // The composer is the side panel. Chrome only opens a side panel in
+  // response to a click, and not in every situation — if it refuses,
+  // say where the button is rather than failing silently.
+  document.getElementById('open-composer-btn').addEventListener('click', async () => {
+    try {
+      const win = await chrome.windows.getCurrent();
+      await chrome.sidePanel.open({ windowId: win.id });
+    } catch {
+      showToast('Click the Edge Studio icon in the toolbar to open the composer beside this window.', 'warning');
+    }
+  });
 }
 
 init();
