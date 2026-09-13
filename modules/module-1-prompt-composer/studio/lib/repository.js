@@ -14,7 +14,7 @@ const ACTIVE_KEY = 'activeProductionId';
 
 export async function loadProductions() {
   const stored = await chrome.storage.local.get([PRODUCTIONS_KEY, ACTIVE_KEY]);
-  state.productions = stored[PRODUCTIONS_KEY] || [];
+  state.productions = (stored[PRODUCTIONS_KEY] || []).map(tidyProduction);
 
   if (state.productions.length === 0) {
     state.productions = [newProduction('First production')];
@@ -30,7 +30,21 @@ export async function loadProductions() {
   state.activeSceneId = production.scenes[0]?.id || null;
 }
 
+// Earlier builds filed a { kind: 'clip' } copy of every render into the
+// out-box as well as on its scene. The out-box has always listed renders
+// straight off their scenes, so those copies were never shown, never
+// updated past the first link, and outlived their scenes when a scene
+// was deleted. They're dropped on load; filed reports are kept.
+function tidyProduction(production) {
+  if (Array.isArray(production.outbox)) {
+    production.outbox = production.outbox.filter((item) => item.kind !== 'clip');
+  }
+  return production;
+}
+
 export async function persistNow() {
+  clearTimeout(pending);
+  pending = null;
   await chrome.storage.local.set({
     [PRODUCTIONS_KEY]: state.productions,
     [ACTIVE_KEY]: state.activeProductionId,
@@ -49,3 +63,10 @@ export function persist() {
     persistNow().catch((err) => console.error('[Edge Studio] Save failed:', err));
   }, 300);
 }
+
+// Closing the tab inside the debounce window used to drop the last
+// keystrokes. The write is started as the page goes away; extension
+// storage calls made during pagehide still complete.
+window.addEventListener('pagehide', () => {
+  if (pending) persistNow().catch(() => {});
+});

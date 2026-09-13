@@ -24,6 +24,7 @@ import {
   parseAssetList,
   parseJsonReply,
   parseSceneList,
+  releaseFromProfile,
   targetById,
 } from './prompt.js';
 import { addAssets } from './assets.js';
@@ -51,8 +52,17 @@ async function chooseWorkerTab(title, hint) {
     return null;
   }
 
+  // Generator-only pages (Sora, Flow) take a prompt but have no reply to
+  // read back, so they can't do this kind of work.
+  const chatTabs = state.chatTabs.filter((t) => t.kind !== 'generator');
+  if (chatTabs.length === 0) {
+    showToast('This needs a ChatGPT, Claude or Gemini chat open — generator pages can’t answer.', 'warning');
+    return null;
+  }
+
   const production = activeProduction();
-  const preferred = state.chatTabs.find((t) => t.platform === targetById(production.target).platform);
+  const targetPlatforms = targetById(production.target).platforms;
+  const preferred = chatTabs.find((t) => targetPlatforms.includes(t.platform));
 
   const values = await openModal({
     title,
@@ -62,8 +72,8 @@ async function chooseWorkerTab(title, hint) {
         name: 'tabId',
         label: 'Run it in',
         type: 'select',
-        value: String((preferred || state.chatTabs[0]).id),
-        options: state.chatTabs.map((t) => ({ value: String(t.id), label: tabName(t) })),
+        value: String((preferred || chatTabs[0]).id),
+        options: chatTabs.map((t) => ({ value: String(t.id), label: tabName(t) })),
       },
     ],
     confirmLabel: 'Send',
@@ -103,6 +113,9 @@ function applyFieldUpdate(scene, update, { blanksOnly }) {
   Object.entries(update.aspects).forEach(([id, text]) => {
     if (blanksOnly && (scene.shot.aspects[id] || '').trim()) return;
     scene.shot.aspects[id] = text;
+    // Written by a pass or a refine now, not by the job profile, so a
+    // later profile switch must leave it alone.
+    releaseFromProfile(scene, id);
     applied += 1;
   });
 
@@ -168,13 +181,16 @@ export async function expandScene() {
 
 // ---------- M4-11: chat to refine ----------
 
+// Resolves true once the round trip has come back (whether or not it
+// changed anything), false if it never ran or was cancelled — so the
+// refine box only clears when the instruction was actually used.
 export async function refineScene(instruction) {
   const production = activeProduction();
   const scene = activeScene();
-  if (!scene) return;
+  if (!scene) return false;
 
   const worker = await chooseWorkerTab('Refine this shot', `Change: ${instruction}`);
-  if (!worker) return;
+  if (!worker) return false;
 
   const reply = await runRoundTrip({
     tabId: worker.id,
@@ -185,7 +201,7 @@ export async function refineScene(instruction) {
     }),
     title: 'Waiting for the refinement',
   });
-  if (reply === null) return;
+  if (reply === null) return false;
 
   // A refine is allowed to rewrite anything — that's the difference
   // between it and an expansion pass.
@@ -216,6 +232,7 @@ export async function refineScene(instruction) {
       ? `Refined: ${changedNames.join(', ')}.`
       : "Nothing changed — the reply didn't name any fields."
   );
+  return true;
 }
 
 // ---------- M4-12: rebuild scenes from a script ----------
@@ -250,6 +267,25 @@ export async function scenesFromScript(prefillText = '') {
     return;
   }
 
+  // Replacing throws away every scene and its render history, which no
+  // other action in the extension does without asking. Ask before the
+  // round trip, not after it, so a "no" doesn't cost a chat message.
+  if (setup.mode === 'replace' && production.scenes.length > 0) {
+    const renderCount = production.scenes.reduce((n, s) => n + s.renders.length, 0);
+    const confirmed = await openModal({
+      title: `Replace all ${production.scenes.length} scene${production.scenes.length === 1 ? '' : 's'}?`,
+      body:
+        `Every scene in "${production.name}" is deleted and rebuilt from the script` +
+        (renderCount
+          ? `, along with ${renderCount} recorded render${renderCount === 1 ? '' : 's'} and their review notes.`
+          : '.') +
+        ' Sequences are emptied. Filed dailies reports keep their copy. This cannot be undone.',
+      confirmLabel: 'Replace scenes',
+      danger: true,
+    });
+    if (confirmed === null) return;
+  }
+
   const worker = await chooseWorkerTab('Break it into shots', 'The breakdown runs in a chat you already have open.');
   if (!worker) return;
 
@@ -276,8 +312,14 @@ export async function scenesFromScript(prefillText = '') {
     return scene;
   });
 
-  if (setup.mode === 'replace') production.scenes = built;
-  else production.scenes.push(...built);
+  if (setup.mode === 'replace') {
+    production.scenes = built;
+    // Every scene a sequence pointed at is gone; an empty sequence would
+    // just be a name with nothing to produce.
+    production.sequences = [];
+  } else {
+    production.scenes.push(...built);
+  }
 
   state.activeSceneId = built[0].id;
   touch(production);

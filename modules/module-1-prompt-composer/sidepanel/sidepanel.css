@@ -675,6 +675,8 @@ button.danger {
 .platform-badge[data-platform="chatgpt"] { color: #74c69d; }
 .platform-badge[data-platform="claude"]  { color: #e0a06a; }
 .platform-badge[data-platform="gemini"]  { color: #7fa6f0; }
+.platform-badge[data-platform="sora"]    { color: #c9a0f0; }
+.platform-badge[data-platform="flow"]    { color: #f0c96a; }
 
 /* ---------- CORE-8 / CORE-9: usage meters ---------- */
 

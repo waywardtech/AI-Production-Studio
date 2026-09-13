@@ -9,7 +9,7 @@
 // PLATFORMS below, which is the single place a redesign lands.
 //
 // This is the accepted screen-scraping tradeoff documented in the spec
-// (§7). The selector lists are ordered most-specific first and fall
+// (§8). The selector lists are ordered most-specific first and fall
 // back to generic structure, so a renamed test id degrades to "still
 // works via the contenteditable fallback" rather than "broken".
 
@@ -57,12 +57,40 @@ const PLATFORMS = [
     assistantSelectors: ['model-response', 'message-content.model-response-text', '.model-response-text'],
     assistantFallback: null,
   },
+
+  // Generator pages. They take a prompt but there's no conversation to
+  // read back, so they're only ever an Insert / Produce destination —
+  // never somewhere Optimize, Fill blanks or Refine can run. Their input
+  // selectors are generic and unverified against the live sites; if
+  // nothing is found, Insert falls back to the clipboard as usual.
+  {
+    id: 'sora',
+    label: 'Sora',
+    kind: 'generator',
+    hosts: ['sora.chatgpt.com'],
+    inputSelectors: ['textarea', 'div[contenteditable="true"]'],
+    assistantSelectors: [],
+    assistantFallback: null,
+  },
+  {
+    id: 'flow',
+    label: 'Flow',
+    kind: 'generator',
+    hosts: ['labs.google'],
+    inputSelectors: ['textarea', 'div[contenteditable="true"]'],
+    assistantSelectors: [],
+    assistantFallback: null,
+  },
 ];
 
+// An exact host wins over a parent-domain match: sora.chatgpt.com is
+// Sora, not ChatGPT, even though it sits under chatgpt.com.
 function currentPlatform() {
   const host = location.hostname.replace(/^www\./, '');
   return (
-    PLATFORMS.find((p) => p.hosts.some((h) => host === h || host.endsWith(`.${h}`))) || null
+    PLATFORMS.find((p) => p.hosts.includes(host)) ||
+    PLATFORMS.find((p) => p.hosts.some((h) => host.endsWith(`.${h}`))) ||
+    null
   );
 }
 
@@ -139,6 +167,13 @@ function captureLatestResponse() {
   const platform = currentPlatform();
   if (!platform) {
     return { success: false, reason: 'Edge Studio does not handle this site.' };
+  }
+
+  if (platform.kind === 'generator') {
+    return {
+      success: false,
+      reason: `${platform.label} is a generator page — there's no reply there to capture.`,
+    };
   }
 
   const turns = findAssistantTurns(platform);

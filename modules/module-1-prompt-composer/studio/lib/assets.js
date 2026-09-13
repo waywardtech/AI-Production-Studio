@@ -91,15 +91,31 @@ async function editAsset(asset) {
     extraButtons: [
       {
         label: 'Delete',
-        onClick: ({ cancel }) => {
+        onClick: async ({ cancel }) => {
+          cancel();
+          const usedIn = production.scenes.filter((scene) => scene.assetIds.includes(asset.id));
+          const asStill = usedIn.filter((scene) => scene.shot.stillAssetId === asset.id).length;
+          const confirmed = await openModal({
+            title: `Delete "${asset.name}"?`,
+            body:
+              (usedIn.length
+                ? `It's attached to ${usedIn.length} scene${usedIn.length === 1 ? '' : 's'}` +
+                  (asStill ? ` and is the opening frame of ${asStill}` : '') +
+                  ', and comes out of all of them. '
+                : '') + 'This cannot be undone.',
+            confirmLabel: 'Delete',
+            danger: true,
+          });
+          if (confirmed === null) return;
+
           production.assets = production.assets.filter((a) => a.id !== asset.id);
-          production.scenes.forEach((scene) => {
+          usedIn.forEach((scene) => {
             scene.assetIds = scene.assetIds.filter((id) => id !== asset.id);
             if (scene.shot.stillAssetId === asset.id) scene.shot.stillAssetId = null;
+            touch(scene);
           });
           touch(production);
           persist();
-          cancel();
           render('assets', 'shot');
           showToast(`Deleted "${asset.name}".`);
         },
@@ -171,7 +187,31 @@ function assetTile(asset) {
 
   const meta = document.createElement('div');
   meta.className = 'asset-meta';
-  meta.textContent = categoryLabel(asset.category);
+
+  const category = document.createElement('span');
+  category.textContent = categoryLabel(asset.category);
+  meta.appendChild(category);
+
+  const controls = document.createElement('span');
+  controls.className = 'asset-controls';
+
+  // Setting the still is its own button rather than a double-click on
+  // the tile. A double-click is two clicks first, and each click toggles
+  // attachment — so un-setting a still by double-clicking could never
+  // work, and setting one briefly detached the asset.
+  if (asset.thumb) {
+    const star = document.createElement('button');
+    star.className = 'link-btn asset-still-btn';
+    star.classList.toggle('active', isStill);
+    star.textContent = isStill ? '★' : '☆';
+    star.title = isStill ? 'Stop using as the opening frame' : 'Use as the opening frame';
+    star.setAttribute('aria-pressed', String(isStill));
+    star.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setStill(asset.id);
+    });
+    controls.appendChild(star);
+  }
 
   const edit = document.createElement('button');
   edit.className = 'link-btn asset-edit';
@@ -181,13 +221,20 @@ function assetTile(asset) {
     e.stopPropagation();
     editAsset(asset);
   });
-  meta.appendChild(edit);
+  controls.appendChild(edit);
+  meta.appendChild(controls);
   tile.appendChild(meta);
 
+  tile.setAttribute('role', 'checkbox');
+  tile.setAttribute('aria-checked', String(attached));
+  tile.tabIndex = 0;
   tile.addEventListener('click', () => toggleAttached(asset.id));
-  tile.addEventListener('dblclick', (e) => {
-    e.preventDefault();
-    setStill(asset.id);
+  tile.addEventListener('keydown', (e) => {
+    if (e.target !== tile) return;
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      toggleAttached(asset.id);
+    }
   });
 
   return tile;

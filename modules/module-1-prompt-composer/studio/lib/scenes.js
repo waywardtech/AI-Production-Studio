@@ -10,8 +10,7 @@ import { render, renderAll } from './render.js';
 import { STATUSES, duplicateScene, newId, newProduction, newScene, touch } from './model.js';
 import { openModal } from '../../sidepanel/lib/modal.js';
 import { showToast } from '../../sidepanel/lib/ui.js';
-import { JOB_PROFILES, VIDEO_TARGETS } from './prompt.js';
-import { applyProfileDefaults } from './shot.js';
+import { JOB_PROFILES, VIDEO_TARGETS, applyProfileDefaults, profileById } from './prompt.js';
 
 const sceneListEl = document.getElementById('scene-list');
 const sequenceListEl = document.getElementById('sequence-list');
@@ -30,20 +29,46 @@ function sceneProgress(scene) {
   return `${filled}/${scene.blocks.length}`;
 }
 
+// Which row the dragged scene should land in front of, by pointer
+// position — the same midpoint test the running order uses.
+function rowAfter(y) {
+  const rows = [...sceneListEl.querySelectorAll('.scene-item:not(.dragging)')];
+  let closest = null;
+  let closestOffset = Number.NEGATIVE_INFINITY;
+  rows.forEach((row) => {
+    const box = row.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closestOffset) {
+      closestOffset = offset;
+      closest = row;
+    }
+  });
+  return closest;
+}
+
 function sceneRow(scene, index) {
   const li = document.createElement('li');
   li.className = 'scene-item';
   li.classList.toggle('active', scene.id === state.activeSceneId);
   li.draggable = true;
 
-  li.addEventListener('dragstart', () => li.classList.add('dragging'));
+  li.addEventListener('dragstart', (e) => {
+    li.classList.add('dragging');
+    // Marks this as an internal reorder, so the page-wide file drop
+    // (boxes.js) doesn't mistake it for files arriving.
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/x-edge-scene', scene.id);
+  });
   li.addEventListener('dragend', () => {
     li.classList.remove('dragging');
     const production = activeProduction();
     const order = [...sceneListEl.querySelectorAll('.scene-item')].map((el) => el.dataset.sceneId);
+    const before = production.scenes.map((s) => s.id).join();
     production.scenes.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-    touch(production);
-    persist();
+    if (production.scenes.map((s) => s.id).join() !== before) {
+      touch(production);
+      persist();
+    }
     render('scenes');
   });
   li.dataset.sceneId = scene.id;
@@ -357,6 +382,22 @@ export function initScenes() {
     profileSelectEl.appendChild(option);
   });
 
+  // The rows only move while dragging if something moves them. Without
+  // this the drop is refused and dragend reads back the original order,
+  // which is why reordering scenes used to do nothing at all.
+  sceneListEl.addEventListener('dragover', (e) => {
+    const dragging = sceneListEl.querySelector('.scene-item.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const after = rowAfter(e.clientY);
+    if (after) sceneListEl.insertBefore(dragging, after);
+    else sceneListEl.appendChild(dragging);
+  });
+  sceneListEl.addEventListener('drop', (e) => {
+    if (sceneListEl.querySelector('.scene-item.dragging')) e.preventDefault();
+  });
+
   productionSelectEl.addEventListener('change', async () => {
     state.activeProductionId = productionSelectEl.value;
     state.activeSceneId = activeProduction().scenes[0]?.id || null;
@@ -375,17 +416,27 @@ export function initScenes() {
 
   profileSelectEl.addEventListener('change', () => {
     const production = activeProduction();
+    const previous = production.profile;
     production.profile = profileSelectEl.value;
     touch(production);
 
-    // A profile carries settings — duration, aspect ratio, what to
-    // avoid. They fill blanks only, so choosing one never rewrites a
-    // value already set by hand.
-    const scene = activeScene();
-    const filled = scene ? applyProfileDefaults(scene, production.profile) : 0;
+    // The profile belongs to the whole production — its wording already
+    // applies to every scene — so its settings do too. Only values a
+    // profile set are replaced; anything typed by hand stays.
+    let scenesChanged = 0;
+    production.scenes.forEach((scene) => {
+      if (applyProfileDefaults(scene, production.profile, previous)) {
+        touch(scene);
+        scenesChanged += 1;
+      }
+    });
     persist();
     render('shot');
-    if (filled) showToast(`Profile applied — ${filled} blank setting${filled === 1 ? '' : 's'} filled.`);
+    showToast(
+      scenesChanged
+        ? `${profileById(production.profile).label} applied to ${scenesChanged} scene${scenesChanged === 1 ? '' : 's'}. Settings you typed yourself were left alone.`
+        : `${profileById(production.profile).label} applied.`
+    );
   });
 
   document.getElementById('new-production-btn').addEventListener('click', newProductionFlow);
@@ -419,11 +470,22 @@ export function initScenes() {
     const scene = activeScene();
     if (!scene) return;
 
+    const sequencesUsing = production.sequences.filter((seq) => seq.sceneIds.includes(scene.id)).length;
+    const consequences = [];
+    if (scene.renders.length) {
+      consequences.push(
+        `its ${scene.renders.length} recorded render${scene.renders.length === 1 ? '' : 's'}, their links and review notes leave the out-box with it`
+      );
+    }
+    if (sequencesUsing) {
+      consequences.push(`it's taken out of ${sequencesUsing} sequence${sequencesUsing === 1 ? '' : 's'}`);
+    }
+
     const confirmed = await openModal({
       title: `Delete "${scene.name}"?`,
-      body: scene.renders.length
-        ? `This scene has ${scene.renders.length} recorded render${scene.renders.length === 1 ? '' : 's'}. Deleting it removes them from the review list; anything already filed in the out-box stays.`
-        : 'This cannot be undone.',
+      body:
+        (consequences.length ? `Deleting it means ${consequences.join(', and ')}. ` : '') +
+        'Dailies reports already filed keep their copy. This cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     });

@@ -186,9 +186,8 @@ function renderRow(entry, scene) {
   link.value = entry.url || '';
   link.addEventListener('change', () => {
     entry.url = link.value.trim();
-    const filed = production.outbox.find((o) => o.renderId === entry.id);
-    if (filed) filed.url = entry.url;
     touch(scene);
+    touch(production);
     persist();
   });
   row.appendChild(link);

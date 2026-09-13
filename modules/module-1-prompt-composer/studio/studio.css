@@ -357,6 +357,27 @@ button.compact {
   font-size: 11px;
 }
 
+.asset-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.asset-still-btn {
+  font-size: 13px;
+  line-height: 1;
+  color: #8d8f99;
+}
+
+.asset-still-btn.active {
+  color: #f5a623;
+}
+
+.asset-tile:focus-visible {
+  outline: 2px solid #4d6bff;
+  outline-offset: 2px;
+}
+
 #asset-search {
   width: 100%;
   padding: 6px 8px;

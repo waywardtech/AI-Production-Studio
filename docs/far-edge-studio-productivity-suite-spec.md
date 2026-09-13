@@ -318,7 +318,7 @@ The workspace is one full-window page (the side panel is too narrow for it), wit
 - Chat-to-refine box that applies a plain-language change to the current shot
 - Per-block preview and highlight-in-assembled-prompt
 - Duplicate scene; bundle scenes into a sequence; rebuild scenes from a pasted or dropped script
-- Prompt optimization per target generator — **Sora (via ChatGPT) and Veo (via Gemini/Flow)** — plus job profiles for recurring work
+- Prompt optimization per target generator — **Sora (on the Sora page or in ChatGPT) and Veo (in Flow or Gemini)** — plus job profiles for recurring work
 - In-box / out-box per production: drop scripts and assets in; produced clips, links and the dailies report out
 - Produce action: assemble → optimize → hand to the generator tab (clipboard fallback) → record the render
 - Review loop: keep / reject / regenerate with notes, notes carried into the regeneration
@@ -340,7 +340,7 @@ The workspace is one full-window page (the side panel is too narrow for it), wit
 - **Surface:** a full-window extension page, not a side-panel tab — the three-column layout needs the width. It opens from the side panel and shares the panel's storage seam, modal and toast.
 - **Generation stays hands-off:** the pipeline composes and hands off the prompt exactly as Optimize does; it never presses send in Dan's chat and never carries an API key.
 - **Expansion is additive:** a pass fills blanks and leaves written fields alone. Overwriting is an explicit choice, never a side effect of iterating.
-- **Priority generators:** Sora (via ChatGPT) and Veo (via Gemini/Flow), matching the existing image-gen decision (#6).
+- **Priority generators:** Sora (Sora page or ChatGPT) and Veo (Flow or Gemini), matching the existing image-gen decision (#6). Generator pages take a prompt but have no reply to read, so rewording always runs in a separate chat.
 - **Storage:** productions live behind the same repository seam as everything else — local until CORE-4, Drive after, with no UI change. Dropped files are held as a reference plus a thumbnail rather than copied wholesale, consistent with the "links, not copies" rule (#1).
 
 ---
@@ -407,7 +407,7 @@ Per the "don't reinvent the wheel" principle in §8, here's what's actually out 
 | 9 | Open-source tools worth evaluating | Researched — see §10 for candidates per module; final adoption still Dan's call |
 | 10 | System tag taxonomy | One standard tag — **Status** (Draft / In Review / Approved / Archived) — plus user-created custom tags on top |
 | 11 | Module 4 surface | A full-window extension page opened from the side panel, not a fourth panel tab — the three-column workspace needs the width |
-| 12 | Priority video generators | Sora (via ChatGPT) and Veo (via Gemini/Flow), matching decision #6 |
+| 12 | Priority video generators | Sora (Sora page or ChatGPT) and Veo (Flow or Gemini), matching decision #6 |
 | 13 | Scene expansion behaviour | Additive — a pass fills blanks only; overwriting written fields is an explicit choice, never a side effect of iterating |
 | 14 | Module 4 storage | Same repository seam as the other modules: local until CORE-4, Drive after. Dropped files are held as a reference plus a thumbnail, per #1 |
 

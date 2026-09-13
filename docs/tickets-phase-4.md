@@ -27,12 +27,12 @@ Define production → scenes → blocks / shot / renders, with sequences, an ass
 **M4-3 — Scene rail: scenes, ordering, duplication, sequences** ✅ *Implemented*
 Create, rename, reorder, duplicate and delete scenes; bundle scenes into named sequences.
 *Acceptance:* A duplicated scene carries its blocks and shot but not its render history; a scene can belong to more than one sequence.
-*Built as:* Drag-to-reorder rail with a filled/total count per scene, double-click to rename and set Status. Sequences are a checklist over the production's scenes and always play in rail order.
+*Built as:* Drag-to-reorder rail with a filled/total count per scene, double-click to rename and set Status. Fixed after review: the rail's drag handler was missing, so reordering silently did nothing. Sequences are a checklist over the production's scenes and always play in rail order.
 
 **M4-4 — Column 1: asset pool, search and multi-select** ✅ *Implemented*
 Searchable, category-filtered grid; ticking attaches an asset to the current scene; one asset can be promoted to the shot's opening still.
 *Acceptance:* Attached assets appear in the assembled prompt with their source URL retained.
-*Built as:* Click to attach, double-click to make it the still. Category chips carry counts. Search covers name, description, category and tags.
+*Built as:* Click to attach, ☆ to make it the still. (Originally double-click, which fought the click-to-attach — un-setting a still that way could never work.) Category chips carry counts. Search covers name, description, category and tags.
 
 **M4-5 — Asset intake: upload, URL, describe** ✅ *Implemented*
 Three ways in: a local image, a URL, or a description of something that doesn't exist yet.
@@ -57,7 +57,7 @@ Show what each block contributes to the whole prompt, so the effect of a change 
 **M4-9 — Generator targets and job profiles** ✅ *Implemented*
 Prompt shaping per target generator, plus profiles for recurring kinds of work.
 *Acceptance:* Switching generator changes how the shot is worded; switching profile fills that profile's settings.
-*Built as:* Targets are **Sora (ChatGPT)** and **Veo (Gemini/Flow)** per decision #12. Profiles: general, comic page → shots, social vertical, establishing/B-roll, dialogue two-shot, action beat, insert. Profile defaults fill blanks only, so choosing one never rewrites a duration set by hand.
+*Built as:* Targets are **Sora** (the Sora page, or a ChatGPT chat) and **Veo** (Flow, or a Gemini chat) per decision #12. Switching profile re-applies across every scene, replacing only values a profile set — hand-typed settings stay. Profiles: general, comic page → shots, social vertical, establishing/B-roll, dialogue two-shot, action beat, insert. Profile defaults fill blanks only, so choosing one never rewrites a duration set by hand.
 
 **M4-10 — Scene seed expansion (blanks only)** ✅ *Implemented*
 Start from a one-line seed and have each pass fill the blanks, building the scene out over iterations.

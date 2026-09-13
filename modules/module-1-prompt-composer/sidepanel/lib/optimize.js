@@ -102,12 +102,16 @@ async function runOptimize() {
     showToast('Build a prompt first.', 'warning');
     return;
   }
-  if (state.detectedTabs.length === 0) {
-    showToast('Open a chat tab to run the optimization in, then Refresh.', 'warning');
+  // Generator pages (Sora, Flow) take prompts but never answer, so the
+  // rewrite has to run in a chat.
+  const chatTabs = state.detectedTabs.filter((t) => t.kind !== 'generator');
+  if (chatTabs.length === 0) {
+    showToast('Open a ChatGPT, Claude or Gemini chat to run the optimization in, then Refresh.', 'warning');
     return;
   }
 
-  const defaultWorkerId = String([...state.selectedTabIds][0] ?? state.detectedTabs[0].id);
+  const tickedChat = [...state.selectedTabIds].find((id) => chatTabs.some((t) => t.id === id));
+  const defaultWorkerId = String(tickedChat ?? chatTabs[0].id);
   // Default the target to whatever the worker tab already is; Dan can
   // change it, since optimizing for Claude inside a ChatGPT tab is a
   // perfectly reasonable thing to want.
@@ -122,7 +126,7 @@ async function runOptimize() {
         label: 'Run it in',
         type: 'select',
         value: defaultWorkerId,
-        options: state.detectedTabs.map((t) => ({
+        options: chatTabs.map((t) => ({
           value: String(t.id),
           label: tabDisplayName(t.id),
         })),

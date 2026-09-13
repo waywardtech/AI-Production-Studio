@@ -20,6 +20,12 @@ function tabName(tab) {
   return `${tab.platformLabel} — ${tab.title || `tab ${tab.id}`}`;
 }
 
+// Tabs that can hold a conversation, as opposed to generator-only pages
+// (Sora, Flow) that take a prompt but have no reply to read back.
+function isChatTab(tab) {
+  return tab.kind !== 'generator';
+}
+
 function scenesInScope(production, scope) {
   if (scope === 'all') return production.scenes;
   if (scope.startsWith('seq:')) {
@@ -34,7 +40,8 @@ function scenesInScope(production, scope) {
 }
 
 // Notes from a rejected pass are carried into the next one rather than
-// retyped — spec §7 P1, and the whole point of writing them down.
+// retyped — spec §7's review loop, and the whole point of writing them
+// down.
 function withNotes(promptText, notes) {
   if (!notes) return promptText;
   return `${promptText}\n\nChanges wanted from the last attempt: ${notes}`;
@@ -46,49 +53,96 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
 
   await refreshChatTabs();
   if (state.chatTabs.length === 0) {
-    showToast('Open the tab you generate in (ChatGPT for Sora, Gemini for Veo), then try again.', 'warning');
+    showToast('Open the tab you generate in (Sora or ChatGPT for Sora, Flow or Gemini for Veo), then try again.', 'warning');
     return;
   }
 
   const target = targetById(production.target);
-  const preferred = state.chatTabs.find((t) => t.platform === target.platform) || state.chatTabs[0];
+  const remembered = production.produceSetup || {};
+  const byId = (id) => state.chatTabs.find((t) => t.id === id);
 
-  const scopeOptions = [{ value: 'scene', label: `This scene only (${activeScene()?.name || '—'})` }];
-  production.sequences.forEach((sequence) => {
-    scopeOptions.push({ value: `seq:${sequence.id}`, label: `Sequence — ${sequence.name} (${sequence.sceneIds.length})` });
-  });
-  scopeOptions.push({ value: 'all', label: `Every scene (${production.scenes.length})` });
+  // Where the prompt goes: last time's tab if it's still open, else a tab
+  // on one of this generator's platforms, in the order the target lists
+  // them (a dedicated generator page before a chat that can also do it).
+  const generatorTab =
+    target.platforms.map((p) => state.chatTabs.find((t) => t.platform === p)).find(Boolean) || null;
+  const defaultDestination = byId(remembered.destinationTabId) || generatorTab || state.chatTabs[0];
 
-  const setup = sceneIds
-    ? { scope: 'preset', tabId: String(preferred.id), optimize: true }
-    : await openModal({
-        title: `Produce for ${target.label}`,
-        hint: 'The prompt is written into the tab you pick. Pressing send stays with you — nothing is submitted on your behalf.',
-        fields: [
-          { name: 'scope', label: 'Produce', type: 'select', value: 'scene', options: scopeOptions },
-          {
-            name: 'tabId',
-            label: 'Write it into',
-            type: 'select',
-            value: String(preferred.id),
-            options: state.chatTabs.map((t) => ({ value: String(t.id), label: tabName(t) })),
-          },
-          {
-            name: 'optimize',
-            label: `Reword it for ${target.label} first (one round trip per shot)`,
-            type: 'checkbox',
-            value: true,
-          },
-        ],
-        confirmLabel: 'Produce',
+  // Where the rewording happens. Deliberately NOT the generator tab by
+  // default: a reword request sent there costs a generation-quota
+  // message and leaves a meta-conversation in the session the clips are
+  // made in. With no other chat open, the safe default is not to reword.
+  const chatTabs = state.chatTabs.filter(isChatTab);
+  const rememberedReword = remembered.rewordTabId === 'none' ? null : byId(remembered.rewordTabId);
+  const defaultReword =
+    remembered.rewordTabId === 'none'
+      ? 'none'
+      : String(
+          (rememberedReword && isChatTab(rememberedReword) && rememberedReword.id) ||
+            chatTabs.find((t) => t.id !== defaultDestination.id)?.id ||
+            'none'
+        );
+
+  const fields = [];
+  if (!sceneIds) {
+    const scopeOptions = [{ value: 'scene', label: `This scene only (${activeScene()?.name || '—'})` }];
+    production.sequences.forEach((sequence) => {
+      scopeOptions.push({
+        value: `seq:${sequence.id}`,
+        label: `Sequence — ${sequence.name} (${sequence.sceneIds.length})`,
       });
+    });
+    scopeOptions.push({ value: 'all', label: `Every scene (${production.scenes.length})` });
+    fields.push({ name: 'scope', label: 'Produce', type: 'select', value: 'scene', options: scopeOptions });
+  }
+
+  fields.push(
+    {
+      name: 'destinationTabId',
+      label: `Generate in`,
+      type: 'select',
+      value: String(defaultDestination.id),
+      options: state.chatTabs.map((t) => ({ value: String(t.id), label: tabName(t) })),
+    },
+    {
+      name: 'rewordTabId',
+      label: `Reword for ${target.label} first, in`,
+      type: 'select',
+      value: defaultReword,
+      options: [
+        { value: 'none', label: "Don't reword — send the assembled shot as it is" },
+        ...chatTabs.map((t) => ({
+          value: String(t.id),
+          label: t.id === defaultDestination.id ? `${tabName(t)} (same tab — uses its quota)` : tabName(t),
+        })),
+      ],
+    }
+  );
+
+  const setup = await openModal({
+    title: sceneIds ? `Regenerate for ${target.label}` : `Produce for ${target.label}`,
+    hint:
+      'Each shot is written into the generator tab and then waits for you: press Enter there, come back, and continue to the next. Nothing is submitted on your behalf.',
+    fields,
+    confirmLabel: sceneIds ? 'Regenerate' : 'Produce',
+  });
   if (setup === null) return;
 
-  const destination = state.chatTabs.find((t) => t.id === Number(setup.tabId));
+  const destination = byId(Number(setup.destinationTabId));
   if (!destination) {
     showToast('That tab is gone. Refresh and try again.', 'warning');
     return;
   }
+  const rewordTab = setup.rewordTabId === 'none' ? null : byId(Number(setup.rewordTabId));
+  if (setup.rewordTabId !== 'none' && !rewordTab) {
+    showToast('The tab chosen for rewording is gone. Refresh and try again.', 'warning');
+    return;
+  }
+
+  production.produceSetup = {
+    destinationTabId: destination.id,
+    rewordTabId: rewordTab ? rewordTab.id : 'none',
+  };
 
   const scenes = sceneIds
     ? sceneIds.map((id) => production.scenes.find((s) => s.id === id)).filter(Boolean)
@@ -100,21 +154,27 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
   }
 
   let produced = 0;
+  let stoppedEarly = false;
 
-  for (const scene of scenes) {
+  for (let i = 0; i < scenes.length; i += 1) {
+    const scene = scenes[i];
+    const isLast = i === scenes.length - 1;
     let finalPrompt = withNotes(assemblePrompt(production, scene), notes);
 
-    if (setup.optimize) {
+    if (rewordTab) {
       const reply = await runRoundTrip({
-        tabId: destination.id,
-        tabName: tabName(destination),
+        tabId: rewordTab.id,
+        tabName: tabName(rewordTab),
         text: withNotes(buildProductionPrompt(production, scene), notes),
-        title: `Wording "${scene.name}" for ${target.label}`,
+        title: `Wording "${scene.name}" for ${target.label} (${i + 1} of ${scenes.length})`,
       });
       // A cancelled or empty round trip stops the run rather than
       // quietly falling back to the unoptimized wording — sending
       // something Dan didn't see is worse than sending nothing.
-      if (reply === null) break;
+      if (reply === null) {
+        stoppedEarly = true;
+        break;
+      }
       finalPrompt = unfence(reply);
     }
 
@@ -123,11 +183,15 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
       const copied = await copyToClipboard(finalPrompt);
       if (!copied) {
         showToast(`Couldn't write "${scene.name}" into that tab or onto the clipboard.`, 'warning');
+        stoppedEarly = true;
         break;
       }
     }
 
-    const record = {
+    // Recorded once the prompt has actually been handed over. The
+    // out-box lists renders straight off their scenes, so there's no
+    // second copy to keep in step.
+    scene.renders.push({
       id: newId('rnd'),
       sceneId: scene.id,
       sceneName: scene.name,
@@ -138,35 +202,43 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
       notes,
       verdict: 'pending',
       at: new Date().toISOString(),
-    };
-    scene.renders.push(record);
-    production.outbox.unshift({
-      id: newId('out'),
-      kind: 'clip',
-      renderId: record.id,
-      sceneId: scene.id,
-      title: scene.name,
-      url: '',
-      at: record.at,
     });
     touch(scene);
+    touch(production);
     produced += 1;
+    await persistNow();
+    render('scenes', 'drawer');
 
-    if (!written) {
-      showToast(`"${scene.name}" is on your clipboard — paste it into ${tabName(destination)}.`, 'warning');
+    if (isLast) break;
+
+    // The next write would replace this shot in the generator's input
+    // box before it was ever sent, so the run waits here until Dan has
+    // sent it.
+    const where = written ? `is in ${tabName(destination)}` : 'is on your clipboard';
+    const action = written ? 'Press Enter there to generate it' : `Paste it into ${tabName(destination)} and send it`;
+    const next = await openModal({
+      title: `Shot ${i + 1} of ${scenes.length} is ready`,
+      body: `"${scene.name}" ${where}. ${action}, then continue — the next shot goes into the same input box and would replace this one.`,
+      confirmLabel: `Next shot (${i + 2} of ${scenes.length})`,
+    });
+    if (next === null) {
+      stoppedEarly = true;
       break;
     }
   }
 
-  touch(production);
   await persistNow();
   render('scenes', 'drawer');
 
-  if (produced > 0) {
-    showToast(
-      `${produced} shot${produced === 1 ? '' : 's'} written into ${tabName(destination)}. Press Enter there, then paste each clip's link into the out-box.`
-    );
-  }
+  if (produced === 0) return;
+
+  const plural = `${produced} shot${produced === 1 ? '' : 's'}`;
+  showToast(
+    stoppedEarly
+      ? `Stopped after ${plural}. The rest weren't sent. Paste each clip's link into the out-box as it arrives.`
+      : `${plural} handed to ${tabName(destination)}. Send the last one there, then paste each clip's link into the out-box.`,
+    stoppedEarly ? 'warning' : 'success'
+  );
 }
 
 // ---------- M4-16: the dailies report ----------

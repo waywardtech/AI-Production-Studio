@@ -17,10 +17,15 @@ chrome.sidePanel
 // permission context needed to query across windows. Each tab carries
 // its platform so the panel can badge it and so Optimize can default
 // its target to whatever the worker tab already is.
+// `kind` separates chats (which answer, so Optimize and the studio's
+// round trips can run in them) from generator pages (which only take a
+// prompt). Both can receive an Insert or a Produce.
 const CHAT_PLATFORMS = [
-  { platform: 'chatgpt', label: 'ChatGPT', urls: ['https://chatgpt.com/*', 'https://chat.openai.com/*'] },
-  { platform: 'claude', label: 'Claude', urls: ['https://claude.ai/*'] },
-  { platform: 'gemini', label: 'Gemini', urls: ['https://gemini.google.com/*'] },
+  { platform: 'chatgpt', label: 'ChatGPT', kind: 'chat', urls: ['https://chatgpt.com/*', 'https://chat.openai.com/*'] },
+  { platform: 'claude', label: 'Claude', kind: 'chat', urls: ['https://claude.ai/*'] },
+  { platform: 'gemini', label: 'Gemini', kind: 'chat', urls: ['https://gemini.google.com/*'] },
+  { platform: 'sora', label: 'Sora', kind: 'generator', urls: ['https://sora.chatgpt.com/*'] },
+  { platform: 'flow', label: 'Flow', kind: 'generator', urls: ['https://labs.google/fx/*'] },
 ];
 
 async function findChatTabs() {
@@ -35,6 +40,7 @@ async function findChatTabs() {
         windowId: tab.windowId,
         platform: entry.platform,
         platformLabel: entry.label,
+        kind: entry.kind,
       })
     );
   }

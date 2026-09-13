@@ -11,7 +11,7 @@ import { state, activeProduction, activeScene } from './state.js';
 import { persist } from './repository.js';
 import { render } from './render.js';
 import { ASPECTS, touch } from './model.js';
-import { assembleSegments, segmentText, profileById } from './prompt.js';
+import { assembleSegments, segmentText, profileById, releaseFromProfile } from './prompt.js';
 import { copyToClipboard, showToast } from '../../sidepanel/lib/ui.js';
 
 const stillEl = document.getElementById('still-slot');
@@ -41,7 +41,7 @@ function renderStill() {
   if (!asset) {
     const empty = document.createElement('p');
     empty.className = 'empty-hint';
-    empty.textContent = 'No opening frame. Double-click a picture in column 1 to use it as the still this shot builds from.';
+    empty.textContent = 'No opening frame. Press ★ on a picture in column 1 to use it as the still this shot builds from.';
     stillEl.appendChild(empty);
     return;
   }
@@ -88,6 +88,8 @@ function aspectRow(aspect, scene) {
   input.placeholder = aspect.placeholder || '';
   input.addEventListener('input', () => {
     scene.shot.aspects[aspect.id] = input.value;
+    // Typed by hand, so it's Dan's now — a profile switch won't touch it.
+    releaseFromProfile(scene, aspect.id);
     touch(scene);
     persist();
     renderPreview();
@@ -185,22 +187,6 @@ export function renderShot() {
   renderPreview();
 }
 
-// Fills empty aspects from the job profile's defaults. Filling blanks
-// only, never overwriting, is the same rule expansion follows
-// (decision #13) — switching profile mid-scene must not silently
-// rewrite a duration Dan chose himself.
-export function applyProfileDefaults(scene, profileId) {
-  const defaults = profileById(profileId).defaults || {};
-  let filled = 0;
-  Object.entries(defaults).forEach(([id, value]) => {
-    if (!(scene.shot.aspects[id] || '').trim()) {
-      scene.shot.aspects[id] = value;
-      filled += 1;
-    }
-  });
-  return filled;
-}
-
 export function initShot({ onRefine }) {
   toggleAspectsBtn.addEventListener('click', () => {
     state.showAdvancedAspects = !state.showAdvancedAspects;
@@ -225,14 +211,16 @@ export function initShot({ onRefine }) {
     renderRefineLog();
   });
 
-  const submitRefine = () => {
+  const submitRefine = async () => {
     const instruction = refineInputEl.value.trim();
     if (!instruction) {
       showToast('Say what should change.', 'warning');
       return;
     }
-    refineInputEl.value = '';
-    onRefine(instruction);
+    // Only cleared once the refine actually ran — cancelling the tab
+    // picker or the wait keeps what was typed.
+    const ran = await onRefine(instruction);
+    if (ran && refineInputEl.value.trim() === instruction) refineInputEl.value = '';
   };
 
   document.getElementById('refine-btn').addEventListener('click', submitRefine);

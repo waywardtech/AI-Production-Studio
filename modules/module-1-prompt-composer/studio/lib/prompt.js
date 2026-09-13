@@ -7,7 +7,14 @@
 // makes the per-block preview cheap enough to recompute on every
 // keystroke.
 
-import { ASPECTS, BLOCK_TYPES, blockLabel, categoryLabel } from './model.js';
+import {
+  ASPECTS,
+  ASSET_CATEGORIES,
+  BLOCK_TYPES,
+  IMPORT_KINDS,
+  blockLabel,
+  categoryLabel,
+} from './model.js';
 
 // ---------- M4-9: target generators ----------
 //
@@ -15,11 +22,15 @@ import { ASPECTS, BLOCK_TYPES, blockLabel, categoryLabel } from './model.js';
 // web UIs that change. Each target says how a shot should be worded for
 // it, and what it will ignore.
 
+// `platforms` is where a prompt for this generator can be handed over,
+// best first: the generator's own page, then a chat that can also run
+// it. Both have to be sites the extension can actually reach — see the
+// PLATFORMS table in content-scripts/chat-adapter.js.
 export const VIDEO_TARGETS = [
   {
     id: 'sora',
-    label: 'Sora (ChatGPT)',
-    platform: 'chatgpt',
+    label: 'Sora',
+    platforms: ['sora', 'chatgpt'],
     shape: 'prose',
     guidance:
       'Write one continuous take as flowing prose, not a list. Name the subject, ' +
@@ -30,8 +41,8 @@ export const VIDEO_TARGETS = [
   },
   {
     id: 'veo',
-    label: 'Veo (Gemini / Flow)',
-    platform: 'gemini',
+    label: 'Veo',
+    platforms: ['flow', 'gemini'],
     shape: 'clauses',
     guidance:
       'Lead with subject and action, then setting, then camera, then lighting and mood, ' +
@@ -111,6 +122,63 @@ export const JOB_PROFILES = [
 
 export function profileById(id) {
   return JOB_PROFILES.find((p) => p.id === id) || JOB_PROFILES[0];
+}
+
+// ---------- M4-9: job profile defaults ----------
+//
+// A profile's settings must never overwrite something Dan chose — that's
+// decision #13. But "only fill blanks" on its own has a trap: General's
+// 16:9 fills a blank, and from then on Social vertical can never set
+// 9:16, because the field isn't blank any more. So each scene remembers
+// which aspects a profile put there (`shot.profileFilled`). Those are the
+// profile's to change; anything typed, expanded or refined is released
+// from that list and becomes Dan's.
+
+function ensureProfileFilled(scene, currentProfileId) {
+  if (Array.isArray(scene.shot.profileFilled)) return;
+  // Scenes saved before this was tracked: treat a value that still
+  // exactly matches the current profile's default as profile-set. Only
+  // an exact match qualifies, so nothing hand-typed is ever reclaimed.
+  const defaults = profileById(currentProfileId).defaults || {};
+  scene.shot.profileFilled = Object.entries(defaults)
+    .filter(([id, value]) => (scene.shot.aspects[id] || '').trim() === value)
+    .map(([id]) => id);
+}
+
+export function releaseFromProfile(scene, aspectId) {
+  if (!Array.isArray(scene.shot.profileFilled)) return;
+  scene.shot.profileFilled = scene.shot.profileFilled.filter((id) => id !== aspectId);
+}
+
+// Brings a scene in line with `profileId`. `previousProfileId` is the
+// profile the scene's profile-set values came from (defaults to the new
+// one, for a freshly created scene). Returns how many aspects changed.
+export function applyProfileDefaults(scene, profileId, previousProfileId = profileId) {
+  ensureProfileFilled(scene, previousProfileId);
+  const defaults = profileById(profileId).defaults || {};
+  let changed = 0;
+
+  // Values the old profile set give way to the new profile's — or clear,
+  // if the new one has no opinion about that aspect.
+  scene.shot.profileFilled.slice().forEach((id) => {
+    const next = defaults[id] ?? '';
+    if ((scene.shot.aspects[id] || '') !== next) {
+      scene.shot.aspects[id] = next;
+      changed += 1;
+    }
+    if (!next) releaseFromProfile(scene, id);
+  });
+
+  // Then the new profile fills whatever is still blank.
+  Object.entries(defaults).forEach(([id, value]) => {
+    if (!(scene.shot.aspects[id] || '').trim()) {
+      scene.shot.aspects[id] = value;
+      if (!scene.shot.profileFilled.includes(id)) scene.shot.profileFilled.push(id);
+      changed += 1;
+    }
+  });
+
+  return changed;
 }
 
 // ---------- M4-8: assembly ----------
@@ -347,8 +415,16 @@ export function parseJsonReply(raw) {
   const fenced = text.match(/```(?:json)?\s*\n([\s\S]*?)```/i);
   if (fenced) candidates.push(fenced[1]);
 
+  // Pasted JSON is usually the whole text — including a bare array,
+  // which the object match below would mangle by taking the span from
+  // the first `{` to the last `}`.
+  candidates.push(text);
+
   const braced = text.match(/\{[\s\S]*\}/);
   if (braced) candidates.push(braced[0]);
+
+  const bracketed = text.match(/\[[\s\S]*\]/);
+  if (bracketed) candidates.push(bracketed[0]);
 
   for (const candidate of candidates) {
     try {
@@ -399,15 +475,63 @@ export function parseSceneList(parsed) {
     .filter((s) => s.name || s.seed || Object.keys(s.blocks).length);
 }
 
+// Maps whatever a person or a chat called a category onto one the pool
+// actually filters by: "characters", "Character", "Mood / Lighting",
+// "lighting" all land somewhere real. Anything unrecognised is "other"
+// rather than an id no category chip will ever show.
+export function normalizeCategory(raw) {
+  const key = String(raw || '').trim().toLowerCase();
+  if (!key) return 'other';
+
+  const byCategory = ASSET_CATEGORIES.find((c) => c.id === key || c.label.toLowerCase() === key);
+  if (byCategory) return byCategory.id;
+
+  const byKind = IMPORT_KINDS.find((k) => k.id === key || k.label.toLowerCase() === key);
+  if (byKind) return byKind.category;
+
+  const singular = ASSET_CATEGORIES.find((c) => c.id === key.replace(/e?s$/, ''));
+  if (singular) return singular.id;
+
+  if (/mood|light|atmosph/.test(key)) return 'mood';
+  return 'other';
+}
+
+function toAsset(entry, fallbackCategory = 'other') {
+  return {
+    name: (entry?.name || '').toString().trim(),
+    category: normalizeCategory(entry?.category || fallbackCategory),
+    description: (entry?.description || '').toString().trim(),
+    sourceUrl: (entry?.sourceUrl || entry?.url || '').toString().trim(),
+  };
+}
+
+// Accepts the three shapes material realistically arrives in:
+//   [ {name, category, ...} ]                      a bare list
+//   { "assets": [ ... ] }                          what the import request asks for
+//   { "characters": [ ... ], "locations": [ ... ] } grouped by kind
 export function parseAssetList(parsed) {
-  const raw = Array.isArray(parsed) ? parsed : parsed?.assets;
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((entry) => ({
-      name: (entry?.name || '').toString().trim(),
-      category: (entry?.category || 'other').toString().trim().toLowerCase(),
-      description: (entry?.description || '').toString().trim(),
-      sourceUrl: (entry?.sourceUrl || '').toString().trim(),
-    }))
-    .filter((a) => a.name);
+  if (!parsed || typeof parsed !== 'object') return [];
+
+  let entries;
+  if (Array.isArray(parsed)) {
+    entries = parsed.map((entry) => toAsset(entry));
+  } else if (Array.isArray(parsed.assets)) {
+    entries = parsed.assets.map((entry) => toAsset(entry));
+  } else {
+    entries = Object.entries(parsed)
+      // Only groups that name a real category — otherwise something like
+      // a pasted { "scenes": [...] } would turn shots into assets.
+      .filter(
+        ([group, value]) =>
+          Array.isArray(value) &&
+          (normalizeCategory(group) !== 'other' || group.trim().toLowerCase() === 'other')
+      )
+      .flatMap(([group, list]) =>
+        list.map((entry) =>
+          typeof entry === 'string' ? toAsset({ name: entry }, group) : toAsset(entry, group)
+        )
+      );
+  }
+
+  return entries.filter((a) => a.name);
 }

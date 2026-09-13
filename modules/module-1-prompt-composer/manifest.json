@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Edge Studio",
   "short_name": "Edge Studio",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Prompt composer, reply manager and video production pipeline for ChatGPT, Claude and Gemini: block-based prompt building, one-click injection, platform-targeted optimization, reply capture, and a three-column scene builder that composes clip prompts for Sora and Veo.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -22,7 +22,9 @@
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://claude.ai/*",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://sora.chatgpt.com/*",
+    "https://labs.google/fx/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -45,7 +47,9 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://claude.ai/*",
-        "https://gemini.google.com/*"
+        "https://gemini.google.com/*",
+        "https://sora.chatgpt.com/*",
+        "https://labs.google/fx/*"
       ],
       "js": [
         "content-scripts/chat-adapter.js"

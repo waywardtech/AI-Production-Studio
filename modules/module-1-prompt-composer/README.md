@@ -66,7 +66,7 @@ docs refer to this module.
 | M4-1 Workspace scaffold | ✅ | Full window, opened from the panel; shares its modal, toast and stylesheet |
 | M4-2 Production/scene/shot model | ⚠️ Partial | Same local-storage stand-in as M1-3, behind the same seam |
 | M4-3 Scene rail + sequences | ✅ | Reorder, duplicate, bundle; a duplicate carries the shot but not the renders |
-| M4-4 Asset pool | ✅ | Search, category chips, tick to attach, double-click for the still |
+| M4-4 Asset pool | ✅ | Search, category chips, click to attach, ☆ for the still |
 | M4-5 Asset intake | ✅ | Upload, URL or description; references and thumbnails, never copies |
 | M4-6 Running order | ✅ | Ten block types, drag to reorder, blanks marked |
 | M4-7 Shot builder | ✅ | The five sketched aspects, plus camera/motion/duration/ratio behind **More** |
@@ -76,7 +76,7 @@ docs refer to this module.
 | M4-11 Chat to refine | ✅ | The one path allowed to rewrite what's already written |
 | M4-12 Scenes from a script | ✅ | The comic-page case: source material in, shot list out |
 | M4-13 In-box / out-box | ⚠️ Partial | Working, on local storage; real Drive folders wait on CORE-2/CORE-3 |
-| M4-14 Produce | ✅ | Writes the prompt into the generator tab and records it; never presses send |
+| M4-14 Produce | ✅ | One shot at a time into the generator tab, pausing between shots; rewording runs in a separate chat; never presses send |
 | M4-15 Review loop | ✅ | Keep / reject / regenerate with notes carried forward |
 | M4-16 Dailies report | ✅ | Markdown, filed to the out-box, downloadable |
 | M4-17 Import material | ✅ | JSON loads directly; freeform notes go through an open chat |
@@ -259,9 +259,13 @@ allowed to rewrite what's already there.
 Click into a block and its contribution lights up inside the whole, so
 you can see which part of the shot to change when the result is wrong.
 
-**Produce** rewords the shot for the chosen generator and writes it into
-that tab. Like Insert and Optimize, it fills the input and stops —
-nothing is submitted for you. What was sent is recorded in the out-box
+**Produce** writes each shot into the generator's tab and then waits:
+press Enter there, come back, and continue to the next — the next shot
+goes into the same input box, so it would otherwise replace the one
+you haven't sent. Rewording for the generator is optional and runs in a
+*separate* chat you pick, so it never spends a generation-quota message
+or clutters the session the clips are made in. Like Insert and
+Optimize, nothing is submitted for you. What was sent is recorded in the out-box
 with the exact prompt, a field for the clip's link, and keep / reject /
 regenerate. A rejected pass's notes are carried into the next attempt
 rather than retyped. **File dailies report** turns the lot into Markdown.
@@ -271,8 +275,13 @@ images join the asset pool, text files land in the in-box. From there a
 script becomes a shot list (**Break into shots**) or a pool of
 characters and locations (**Import material**).
 
-**Generators.** Sora (via ChatGPT) and Veo (via Gemini/Flow), per spec
-decision #12. Adding another is an entry in `VIDEO_TARGETS` in
+**Generators.** Sora and Veo, per spec decision #12. A Sora prompt can
+go to the Sora page (`sora.chatgpt.com`) or a ChatGPT chat; a Veo prompt
+to Flow (`labs.google/fx`) or a Gemini chat. Sora and Flow are
+*generator pages* — they take a prompt but have no reply to read, so
+Optimize, Fill blanks and Refine only ever run in chats. Their input
+selectors are generic and unverified; if one can't be found, the prompt
+goes to the clipboard as usual. Adding another is an entry in `VIDEO_TARGETS` in
 `studio/lib/prompt.js` with its own guidance — nothing else changes.
 
 **Assets are references.** An uploaded image is stored as a 320px
@@ -383,7 +392,7 @@ mid-navigation, or a URL outside the extension's host permissions).
 
 `content-scripts/chat-adapter.js` is the only file that touches any
 chat platform's markup, and it's the accepted screen-scraping tradeoff
-documented in the spec (§7). One adapter serves all three platforms —
+documented in the spec (§8). One adapter serves all three platforms —
 the plumbing and insertion strategies are identical and only the
 selectors differ, so those live in a single `PLATFORMS` table at the
 top of the file. That table is where a redesign lands.
