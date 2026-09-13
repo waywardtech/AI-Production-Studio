@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Edge Studio — Production</title>
+  <title>Edge Studio — Studio</title>
   <link rel="stylesheet" href="studio.css" />
 </head>
 <body class="studio">
@@ -10,7 +10,9 @@
   <header class="studio-header">
     <div class="brand">
       <h1>Edge Studio</h1>
-      <span class="subtitle">Video &amp; Media Production Pipeline</span>
+      <!-- Filled by shared/project-bar.js — the same switcher the side
+           panel shows, following the same setting. -->
+      <div id="project-bar"></div>
     </div>
 
     <div class="header-controls">
@@ -18,8 +20,8 @@
         <span>Production</span>
         <select id="production-select"></select>
       </label>
-      <button id="new-production-btn" class="secondary compact">New</button>
-      <button id="rename-production-btn" class="secondary compact">Rename</button>
+      <button id="new-production-btn" class="link-btn" title="New production in this project">+ New</button>
+      <button id="rename-production-btn" class="link-btn" title="Rename, set status or delete this production">✎</button>
 
       <label class="control">
         <span>Generator</span>

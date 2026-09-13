@@ -2,17 +2,25 @@
 // vocabularies the three columns are built from.
 //
 // Pure — no DOM, no chrome. Everything here is either a constant list
-// or a factory, so the storage seam in repository.js has plain objects
-// to hand to Drive when CORE-4 lands.
+// or a factory.
 //
-//   production → scenes → blocks (the running order)
-//                       → shot (the still and its aspects)
-//                       → renders (what came back)
-//              → assets (the pool column 1 draws from)
-//              → sequences (named, ordered bundles of scenes)
-//              → inbox / outbox
+//   project → productions → scenes → blocks (the running order)
+//                                  → shot (the still and its aspects)
+//                                  → renders (what came back)
+//                         → sequences (named, ordered bundles of scenes)
+//           → assets     (the pool column 1 draws from — shared by every
+//                         production in the project)
+//           → documents  (in-box scripts and notes, out-box reports —
+//                         each tagged with the production it belongs to)
+//
+// Productions, assets and documents are each their own record in the
+// shared store (shared/store.js), rather than assets and boxes living
+// inside the production.
 
-export const STATUSES = ['Draft', 'In Review', 'Approved', 'Archived'];
+import { newId, nowISO } from '../../shared/store.js';
+
+export { STATUSES } from '../../shared/model.js';
+export { newId };
 
 // Column 2's block types. The first four are the ones on the sketch and
 // are what a new scene starts with; the rest are there to be added.
@@ -72,13 +80,6 @@ export const IMPORT_KINDS = [
 
 export const RENDER_VERDICTS = ['pending', 'keep', 'reject', 'regen'];
 
-export function newId(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function nowISO() {
-  return new Date().toISOString();
-}
 
 export function newBlock(type, text = '') {
   return { id: newId('blk'), type, text };
@@ -111,6 +112,7 @@ export function newScene(name = 'Untitled scene', seed = '') {
 export function newAsset(fields = {}) {
   return {
     id: newId('ast'),
+    projectId: fields.projectId || null,
     name: fields.name || 'Untitled asset',
     category: fields.category || 'other',
     description: fields.description || '',
@@ -119,25 +121,22 @@ export function newAsset(fields = {}) {
     origin: fields.origin || 'manual', // manual | upload | web | drive | imported | described
     fileRef: fields.fileRef || null, // { name, size, type } for a dropped file
     tags: fields.tags || [],
-    addedAt: nowISO(),
   };
 }
 
-export function newProduction(name = 'Untitled production') {
+export function newProduction({ projectId, name = 'Untitled production' } = {}) {
   const scene = newScene('Scene 1');
   return {
     id: newId('prd'),
+    projectId,
     name,
     status: 'Draft',
-    createdAt: nowISO(),
-    updatedAt: nowISO(),
     target: 'sora',
     profile: 'general',
     scenes: [scene],
     sequences: [], // { id, name, sceneIds: [] }
-    assets: [],
-    inbox: [], // { id, kind, name, text, at } — scripts and notes waiting to be used
-    outbox: [], // { id, kind: 'clip' | 'report', title, url, body, sceneId, at }
+    // Produced clips live on their scenes (scene.renders); scripts, notes
+    // and dailies reports are documents records, not fields on here.
   };
 }
 

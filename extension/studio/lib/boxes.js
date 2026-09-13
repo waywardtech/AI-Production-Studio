@@ -5,15 +5,23 @@
 // coming out. One drawer serves both — they're the same list of things
 // with different verbs on them.
 //
-// Dropped files are read, not copied: a script becomes text in the
+// Both boxes are views, not containers of their own:
+//   in-box  = the production's documents with box 'inbox' (scripts, notes)
+//   out-box = the renders recorded on the production's scenes, plus its
+//             documents with box 'outbox' (filed dailies reports)
+// With Google connected, each document is a Google Doc in the
+// production's In-box or Out-box folder.
+//
+// Dropped files are read, not copied: a script becomes a document in the
 // in-box, an image becomes a reference plus a thumbnail in the asset
 // pool.
 
-import { activeProduction } from './state.js';
-import { persist, persistNow } from './repository.js';
+import { state, activeProduction, productionDocuments } from './state.js';
+import { deleteDocument, persist, saveDocument } from './repository.js';
 import { render } from './render.js';
-import { newId, touch } from './model.js';
+import { touch } from './model.js';
 import { targetById } from './prompt.js';
+import { newDocument } from '../../shared/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { downloadText, isImage, isText, readText } from './files.js';
@@ -49,16 +57,23 @@ function allRenders(production) {
 
 // ---------- in-box ----------
 
-export async function addToInbox({ kind, name, text }) {
+export async function addToInbox({ kind, title, text }) {
   const production = activeProduction();
-  production.inbox.unshift({ id: newId('in'), kind, name, text, at: new Date().toISOString() });
-  touch(production);
-  await persistNow();
+  if (!production) return null;
+  const doc = newDocument({
+    projectId: state.projectId,
+    productionId: production.id,
+    box: 'inbox',
+    kind,
+    title,
+    text,
+  });
+  await saveDocument(doc);
   render('drawer');
+  return doc;
 }
 
-function inboxRow(item) {
-  const production = activeProduction();
+function inboxRow(doc) {
   const row = document.createElement('div');
   row.className = 'box-row';
 
@@ -67,19 +82,19 @@ function inboxRow(item) {
 
   const title = document.createElement('span');
   title.className = 'box-title';
-  title.textContent = item.name;
+  title.textContent = doc.title;
   head.appendChild(title);
 
   const meta = document.createElement('span');
   meta.className = 'box-meta';
-  meta.textContent = `${item.kind} · ${item.text.length} chars`;
+  meta.textContent = `${doc.kind} · ${doc.text.length} chars`;
   head.appendChild(meta);
 
   row.appendChild(head);
 
   const preview = document.createElement('p');
   preview.className = 'box-preview';
-  preview.textContent = item.text.slice(0, 240) + (item.text.length > 240 ? '…' : '');
+  preview.textContent = doc.text.slice(0, 240) + (doc.text.length > 240 ? '…' : '');
   row.appendChild(preview);
 
   const actions = document.createElement('div');
@@ -90,7 +105,7 @@ function inboxRow(item) {
   toScenes.textContent = 'Break into shots';
   toScenes.addEventListener('click', () => {
     closeDrawer();
-    scenesFromScript(item.text);
+    scenesFromScript(doc.text);
   });
   actions.appendChild(toScenes);
 
@@ -99,7 +114,7 @@ function inboxRow(item) {
   toAssets.textContent = 'Import material';
   toAssets.addEventListener('click', () => {
     closeDrawer();
-    importMaterial(item.text);
+    importMaterial(doc.text);
   });
   actions.appendChild(toAssets);
 
@@ -107,9 +122,14 @@ function inboxRow(item) {
   remove.className = 'secondary compact';
   remove.textContent = 'Remove';
   remove.addEventListener('click', async () => {
-    production.inbox = production.inbox.filter((i) => i.id !== item.id);
-    touch(production);
-    await persistNow();
+    const confirmed = await openModal({
+      title: `Remove "${doc.title}"?`,
+      body: 'It comes out of the in-box. With Google Docs connected, its Doc goes to your Drive trash.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (confirmed === null) return;
+    await deleteDocument(doc.id);
     renderDrawer();
   });
   actions.appendChild(remove);
@@ -137,7 +157,7 @@ async function setVerdict(entry, scene, verdict) {
     entry.verdict = 'regen';
     entry.notes = values.notes.trim();
     touch(scene);
-    await persistNow();
+    persist(production);
     renderDrawer();
     closeDrawer();
     await produceScenes({ sceneIds: [scene.id], notes: entry.notes });
@@ -146,8 +166,7 @@ async function setVerdict(entry, scene, verdict) {
 
   entry.verdict = entry.verdict === verdict ? 'pending' : verdict;
   touch(scene);
-  touch(production);
-  persist();
+  persist(production);
   renderDrawer();
   render('scenes');
 }
@@ -187,8 +206,7 @@ function renderRow(entry, scene) {
   link.addEventListener('change', () => {
     entry.url = link.value.trim();
     touch(scene);
-    touch(production);
-    persist();
+    persist(production);
   });
   row.appendChild(link);
 
@@ -228,7 +246,7 @@ function renderRow(entry, scene) {
   return row;
 }
 
-function reportRow(item) {
+function reportRow(doc) {
   const production = activeProduction();
   const row = document.createElement('div');
   row.className = 'box-row report';
@@ -238,12 +256,12 @@ function reportRow(item) {
 
   const title = document.createElement('span');
   title.className = 'box-title';
-  title.textContent = item.title;
+  title.textContent = doc.title;
   head.appendChild(title);
 
   const meta = document.createElement('span');
   meta.className = 'box-meta';
-  meta.textContent = new Date(item.at).toLocaleString();
+  meta.textContent = new Date(doc.createdAt).toLocaleString();
   head.appendChild(meta);
 
   row.appendChild(head);
@@ -256,8 +274,8 @@ function reportRow(item) {
   view.textContent = 'View';
   view.addEventListener('click', () =>
     openModal({
-      title: item.title,
-      fields: [{ name: 'body', label: 'Report', type: 'textarea', rows: 18, value: item.body }],
+      title: doc.title,
+      fields: [{ name: 'body', label: 'Report', type: 'textarea', rows: 18, value: doc.text }],
       confirmLabel: 'Close',
     })
   );
@@ -267,8 +285,8 @@ function reportRow(item) {
   download.className = 'secondary compact';
   download.textContent = 'Download';
   download.addEventListener('click', () => {
-    const stamp = item.at.slice(0, 10);
-    downloadText(`dailies-${production.name.replace(/\W+/g, '-').toLowerCase()}-${stamp}.md`, item.body);
+    const stamp = (doc.createdAt || new Date().toISOString()).slice(0, 10);
+    downloadText(`dailies-${production.name.replace(/\W+/g, '-').toLowerCase()}-${stamp}.md`, doc.text);
   });
   actions.appendChild(download);
 
@@ -276,9 +294,14 @@ function reportRow(item) {
   remove.className = 'secondary compact';
   remove.textContent = 'Remove';
   remove.addEventListener('click', async () => {
-    production.outbox = production.outbox.filter((o) => o.id !== item.id);
-    touch(production);
-    await persistNow();
+    const confirmed = await openModal({
+      title: `Remove "${doc.title}"?`,
+      body: 'The report comes out of the out-box. With Google Docs connected, its Doc goes to your Drive trash.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (confirmed === null) return;
+    await deleteDocument(doc.id);
     renderDrawer();
   });
   actions.appendChild(remove);
@@ -289,9 +312,12 @@ function reportRow(item) {
 
 export function renderDrawer() {
   const production = activeProduction();
-  document.getElementById('inbox-count').textContent = String(production?.inbox.length || 0);
+  const inbox = productionDocuments('inbox');
+  const reports = productionDocuments('outbox');
+
+  document.getElementById('inbox-count').textContent = String(inbox.length);
   document.getElementById('outbox-count').textContent = String(
-    production ? allRenders(production).length + production.outbox.filter((o) => o.kind === 'report').length : 0
+    production ? allRenders(production).length + reports.length : 0
   );
 
   if (!openBox || !production) return;
@@ -304,13 +330,13 @@ export function renderDrawer() {
       'Drop scripts, notes and images anywhere on the page. Scripts land here; images go straight into the asset pool.';
     drawerActionBtn.textContent = 'Paste text…';
 
-    if (production.inbox.length === 0) {
+    if (inbox.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'empty-hint';
       empty.textContent = 'Nothing waiting. Drop a script in, or paste one.';
       drawerBodyEl.appendChild(empty);
     } else {
-      production.inbox.forEach((item) => drawerBodyEl.appendChild(inboxRow(item)));
+      inbox.forEach((doc) => drawerBodyEl.appendChild(inboxRow(doc)));
     }
     return;
   }
@@ -320,7 +346,6 @@ export function renderDrawer() {
     'Everything produced, with the prompt that made it. Paste each clip’s link in, mark it keep or reject, then file the dailies.';
   drawerActionBtn.textContent = 'File dailies report';
 
-  const reports = production.outbox.filter((o) => o.kind === 'report');
   const renders = allRenders(production);
 
   if (renders.length === 0 && reports.length === 0) {
@@ -332,7 +357,7 @@ export function renderDrawer() {
   }
 
   renders.forEach(({ entry, scene }) => drawerBodyEl.appendChild(renderRow(entry, scene)));
-  reports.forEach((item) => drawerBodyEl.appendChild(reportRow(item)));
+  reports.forEach((doc) => drawerBodyEl.appendChild(reportRow(doc)));
 }
 
 // ---------- drop handling ----------
@@ -346,7 +371,7 @@ async function ingest(files) {
   if (images.length) await ingestImageFiles(images);
 
   for (const file of texts) {
-    await addToInbox({ kind: 'script', name: file.name, text: await readText(file) });
+    await addToInbox({ kind: 'script', title: file.name, text: await readText(file) });
   }
 
   if (texts.length) {
@@ -390,7 +415,7 @@ export function initBoxes() {
     }
     await addToInbox({
       kind: 'note',
-      name: values.name.trim() || 'Pasted notes',
+      title: values.name.trim() || 'Pasted notes',
       text: values.text.trim(),
     });
     renderDrawer();

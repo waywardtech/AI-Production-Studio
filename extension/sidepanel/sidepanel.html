@@ -6,12 +6,14 @@
   <link rel="stylesheet" href="sidepanel.css" />
 </head>
 <body>
-  <header>
-    <div class="section-head">
+  <header class="app-header">
+    <div class="brand-row">
       <h1>Edge Studio</h1>
-      <button id="open-studio-btn" class="link-btn">Production ↗</button>
+      <button id="open-studio-btn" class="link-btn" title="Open the production studio in a full window">Studio ↗</button>
     </div>
-    <p class="subtitle">Prompt Composer &amp; Response Manager</p>
+    <!-- Filled by shared/project-bar.js. Everything below belongs to
+         the project chosen here, in this panel and in the studio. -->
+    <div id="project-bar"></div>
   </header>
 
   <!-- Chat tabs sit outside the Prompts/Replies tabs because both need

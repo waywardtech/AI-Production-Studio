@@ -6,6 +6,8 @@
 // outside the module that declares it.
 
 export const state = {
+  projectId: null, // the active project — follows es:settings:app.activeProjectId
+  projectName: '',
   canvasBlocks: [], // { id, type, text }
   blockTypes: [], // { id, label }
   detectedTabs: [], // { id, title, url, windowId, platform }

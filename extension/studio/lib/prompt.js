@@ -193,7 +193,11 @@ function assetLine(asset) {
 // The assembled prompt as its parts, each tagged with what produced it.
 // Column 3 renders the joined text and highlights the segment belonging
 // to whichever block is selected — that's the per-block preview.
-export function assembleSegments(production, scene, { target, profile } = {}) {
+//
+// `assets` is the project's pool. It's passed in rather than read off
+// the production because assets belong to the project, shared by every
+// production in it.
+export function assembleSegments(production, scene, { target, profile, assets = [] } = {}) {
   const tgt = targetById(target ?? production.target);
   const prof = profileById(profile ?? production.profile);
   const segments = [];
@@ -210,14 +214,14 @@ export function assembleSegments(production, scene, { target, profile } = {}) {
   });
 
   const stillAsset = scene.shot.stillAssetId
-    ? production.assets.find((a) => a.id === scene.shot.stillAssetId)
+    ? assets.find((a) => a.id === scene.shot.stillAssetId)
     : null;
   if (stillAsset) {
     push('still', 'Opening frame', assetLine(stillAsset), { assetId: stillAsset.id });
   }
 
   const refs = scene.assetIds
-    .map((id) => production.assets.find((a) => a.id === id))
+    .map((id) => assets.find((a) => a.id === id))
     .filter((a) => a && a.id !== scene.shot.stillAssetId);
   if (refs.length) {
     push('assets', 'References', refs.map((a) => `- ${assetLine(a)}`).join('\n'));
@@ -303,8 +307,8 @@ export function buildSeedExpansionRequest(production, scene, { target, profile, 
 
 // M4-11. Refine takes plain language and returns the same shape, but is
 // allowed to change written fields — that is what Dan asked for.
-export function buildRefineRequest(production, scene, instruction, { target, profile } = {}) {
-  const current = assemblePrompt(production, scene, { target, profile });
+export function buildRefineRequest(production, scene, instruction, { target, profile, assets = [] } = {}) {
+  const current = assemblePrompt(production, scene, { target, profile, assets });
   return [
     'You are refining one shot in a shot list. Below is the shot as it stands, then a change to make.',
     '',
@@ -376,10 +380,10 @@ export function buildImportRequest(text) {
 
 // M4-14. The final hand-off: the assembled shot, reworded for whichever
 // generator is about to run it.
-export function buildProductionPrompt(production, scene, { target, profile } = {}) {
+export function buildProductionPrompt(production, scene, { target, profile, assets = [] } = {}) {
   const tgt = targetById(target ?? production.target);
   const prof = profileById(profile ?? production.profile);
-  const parts = assembleSegments(production, scene, { target, profile })
+  const parts = assembleSegments(production, scene, { target, profile, assets })
     .filter((s) => s.key !== 'target' && s.key !== 'profile')
     .map(segmentText);
 

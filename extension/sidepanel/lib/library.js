@@ -1,7 +1,9 @@
-// The prompt library (M1-3 / M1-4) with CORE-5 tagging and grouping.
+// The prompt library (M1-3 / M1-4) with CORE-5 tagging and grouping,
+// scoped to the active project.
 
 import { state } from './state.js';
-import { getLibrary, saveLibrary } from './storage.js';
+import { listPrompts, savePrompt, deletePrompt as removePrompt } from './storage.js';
+import { STATUSES, newPrompt, parseTags } from '../../shared/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, switchTab } from '../../shared/ui.js';
 import { loadBlocksIntoBuilder } from './builder.js';
@@ -10,19 +12,6 @@ const libraryListEl = document.getElementById('library-list');
 const tagFilterRowEl = document.getElementById('tag-filter-row');
 const filterInputEl = document.getElementById('filter-input');
 
-const STATUSES = ['Draft', 'In Review', 'Approved', 'Archived'];
-
-// Stored lowercase so "Apex", "apex" and "APEX" are one group.
-export function parseTags(raw) {
-  return [
-    ...new Set(
-      (raw || '')
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean)
-    ),
-  ];
-}
 
 async function savePromptFromBuilder() {
   if (state.canvasBlocks.length === 0) {
@@ -48,17 +37,15 @@ async function savePromptFromBuilder() {
     return;
   }
 
-  const library = await getLibrary();
-  library.unshift({
-    id: `prompt-${Date.now()}`,
-    title,
-    blocks: state.canvasBlocks,
-    tags: parseTags(result.tags),
-    status: 'Draft', // CORE-5 standard system tag
-    createdAt: new Date().toISOString(),
-  });
-  await saveLibrary(library);
-  showToast(`Saved "${title}" to your library.`);
+  await savePrompt(
+    newPrompt({
+      projectId: state.projectId,
+      title,
+      blocks: state.canvasBlocks,
+      tags: parseTags(result.tags),
+    })
+  );
+  showToast(`Saved "${title}" to ${state.projectName}.`);
   await renderLibrary();
 }
 
@@ -86,13 +73,10 @@ async function editPromptMeta(item) {
     return;
   }
 
-  const library = await getLibrary();
-  const target = library.find((x) => x.id === item.id);
-  if (!target) return;
-  target.title = title;
-  target.tags = parseTags(result.tags);
-  target.status = result.status;
-  await saveLibrary(library);
+  item.title = title;
+  item.tags = parseTags(result.tags);
+  item.status = result.status;
+  await savePrompt(item);
   showToast(`Updated "${title}".`);
   await renderLibrary();
 }
@@ -108,8 +92,7 @@ async function deletePrompt(item) {
   });
   if (confirmed === null) return;
 
-  const library = await getLibrary();
-  await saveLibrary(library.filter((x) => x.id !== item.id));
+  await removePrompt(item.id);
   showToast(`Deleted "${item.title}".`);
   await renderLibrary();
 }
@@ -201,7 +184,7 @@ function appendEmpty(text) {
 }
 
 export async function renderLibrary() {
-  const library = await getLibrary();
+  const library = await listPrompts(state.projectId);
   const q = filterInputEl.value.trim().toLowerCase();
 
   const allTags = [...new Set(library.flatMap((item) => item.tags || []))].sort();
@@ -222,7 +205,7 @@ export async function renderLibrary() {
   libraryListEl.innerHTML = '';
 
   if (visible.length === 0) {
-    appendEmpty(library.length === 0 ? 'No saved prompts yet.' : 'No matches.');
+    appendEmpty(library.length === 0 ? `No saved prompts in ${state.projectName} yet.` : 'No matches.');
     return;
   }
 

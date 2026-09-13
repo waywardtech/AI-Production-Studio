@@ -1,7 +1,8 @@
 // The Replies tab: capture (M2-1), save (M2-2), and reuse (M2-3).
 
 import { state } from './state.js';
-import { getResponses, saveResponses } from './storage.js';
+import { listReplies, saveReply, deleteReply } from './storage.js';
+import { newReply } from '../../shared/model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard, selectedTextOf } from '../../shared/ui.js';
 import { tabDisplayName, tabPlatform } from './targets.js';
@@ -158,24 +159,20 @@ async function saveCapture(capture) {
     return;
   }
 
-  const responses = await getResponses();
-  responses.unshift({
-    id: `response-${Date.now()}`,
-    title,
-    text,
-    status: 'Draft', // CORE-5 standard system tag
-    // Per CORE-4 the item points back at where it came from rather than
-    // pretending to be the original.
-    source: {
-      platform: capture.platform || 'ChatGPT',
-      tabLabel: capture.label,
-      url: capture.url,
-      kind: capture.kind,
-    },
-    capturedAt: capture.capturedAt,
-    savedAt: new Date().toISOString(),
-  });
-  await saveResponses(responses);
+  await saveReply(
+    newReply({
+      projectId: state.projectId,
+      title,
+      text,
+      source: {
+        platform: capture.platform || 'ChatGPT',
+        tabLabel: capture.label,
+        url: capture.url,
+        kind: capture.kind,
+      },
+      capturedAt: capture.capturedAt,
+    })
+  );
 
   state.captures = state.captures.filter((c) => c.id !== capture.id);
   renderCaptures();
@@ -186,7 +183,7 @@ async function saveCapture(capture) {
 // ---------- Saved replies ----------
 
 export function toMarkdown(item) {
-  const when = new Date(item.savedAt).toLocaleString();
+  const when = new Date(item.createdAt).toLocaleString();
   return [
     `# ${item.title}`,
     '',
@@ -201,7 +198,7 @@ export function toMarkdown(item) {
 }
 
 export async function renderResponses() {
-  const responses = await getResponses();
+  const responses = await listReplies(state.projectId);
   const q = responseFilterEl.value.trim().toLowerCase();
   const filtered = q
     ? responses.filter(
@@ -217,7 +214,7 @@ export async function renderResponses() {
   if (filtered.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'empty-state';
-    empty.textContent = q ? 'No matches.' : 'No saved replies yet.';
+    empty.textContent = q ? 'No matches.' : `No saved replies in ${state.projectName} yet.`;
     responseListEl.appendChild(empty);
     return;
   }
@@ -245,7 +242,7 @@ export async function renderResponses() {
     meta.className = 'response-meta';
     meta.textContent = `${item.source?.platform || 'ChatGPT'} · ${
       item.source?.tabLabel || 'unknown tab'
-    } · ${new Date(item.savedAt).toLocaleDateString()}`;
+    } · ${new Date(item.createdAt).toLocaleDateString()}`;
     li.appendChild(meta);
 
     // Read-only, but a real textarea so a part of it can be highlighted
@@ -299,8 +296,7 @@ export async function renderResponses() {
       });
       if (confirmed === null) return;
 
-      const all = await getResponses();
-      await saveResponses(all.filter((x) => x.id !== item.id));
+      await deleteReply(item.id);
       showToast(`Deleted "${item.title}".`);
       await renderResponses();
     });

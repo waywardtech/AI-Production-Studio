@@ -2,8 +2,17 @@
 // Covers: M1-1 (extension scaffold), M1-5/M1.5-6 (tab detection across
 // ChatGPT, Claude and Gemini), M1-7/M1-8 (send-to-tab relay)
 
+import { migrate } from './shared/migrate.js';
+
+// Installing or updating brings stored data into the current shape
+// straight away, rather than waiting for the first page to open. Every
+// page runs the same migration on load too; it's safe to run twice.
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Edge Studio] Installed.');
+  migrate()
+    .then((result) => {
+      if (result.migrated) console.log('[Edge Studio] Migrated stored data:', result);
+    })
+    .catch((error) => console.error('[Edge Studio] Migration failed:', error));
 });
 
 // Open the side panel when the toolbar icon is clicked.

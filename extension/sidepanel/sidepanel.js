@@ -30,6 +30,10 @@ import { initInsert } from './lib/insert.js';
 import { initOptimize } from './lib/optimize.js';
 import { renderCaptures, renderResponses, initReplies } from './lib/replies.js';
 import { loadUsage, renderUsage, updateCostEstimate, initUsage } from './lib/usage.js';
+import { state } from './lib/state.js';
+import { migrate } from '../shared/migrate.js';
+import { subscribe } from '../shared/store.js';
+import { mountProjectBar } from '../shared/project-bar.js';
 
 // blocks.js owns the palette but shouldn't have to know how the builder
 // renders, so the two are joined here rather than importing each other.
@@ -57,7 +61,48 @@ document.getElementById('open-studio-btn').addEventListener('click', async () =>
   }
 });
 
+// Other pages (the studio) and, once connected, Google sync write to the
+// same store. Redraw what they changed rather than showing a stale list.
+// This page's own writes are ignored — it already drew them.
+function followStoreChanges() {
+  let queued = new Set();
+  let timer = null;
+
+  subscribe((events) => {
+    events
+      .filter((e) => !e.self)
+      .forEach((e) => {
+        if (e.kind === 'record' && e.collection === 'prompts') queued.add('library');
+        if (e.kind === 'record' && e.collection === 'replies') queued.add('replies');
+        if (e.kind === 'setting' && e.name === 'usage') queued.add('usage');
+        if (e.kind === 'setting' && e.name === 'app') queued.add('blocks');
+      });
+    if (!queued.size) return;
+
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const due = queued;
+      queued = new Set();
+      if (due.has('library')) await renderLibrary();
+      if (due.has('replies')) await renderResponses();
+      if (due.has('usage')) {
+        await loadUsage();
+        renderUsage();
+        updateCostEstimate();
+      }
+      if (due.has('blocks')) {
+        await loadBlockTypes();
+        refreshBlockUI();
+      }
+    }, 50);
+  });
+}
+
 async function init() {
+  // Earlier builds kept data in a different shape; bring it across
+  // before anything reads.
+  await migrate();
+
   initTabs();
   initBuilder();
   initLibrary();
@@ -72,10 +117,22 @@ async function init() {
   renderUsage();
   refreshBlockUI();
   updatePreview();
-
-  await renderLibrary();
   renderCaptures();
-  await renderResponses();
+
+  // Mounting the project bar resolves the active project and draws the
+  // project's lists; it calls back again whenever the project changes,
+  // from this panel or from the studio.
+  await mountProjectBar(document.getElementById('project-bar'), {
+    onChange: async (project) => {
+      state.projectId = project.id;
+      state.projectName = project.name;
+      state.activeTagFilter = null;
+      await renderLibrary();
+      await renderResponses();
+    },
+  });
+
+  followStoreChanges();
   await refreshTabs();
   updateCostEstimate();
 }

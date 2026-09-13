@@ -25,7 +25,7 @@ export function currentPromptText() {
   const production = activeProduction();
   const scene = activeScene();
   if (!production || !scene) return '';
-  return assembleSegments(production, scene).map(segmentText).join('\n\n');
+  return assembleSegments(production, scene, { assets: state.assets }).map(segmentText).join('\n\n');
 }
 
 function renderStill() {
@@ -35,7 +35,7 @@ function renderStill() {
   if (!scene) return;
 
   const asset = scene.shot.stillAssetId
-    ? production.assets.find((a) => a.id === scene.shot.stillAssetId)
+    ? state.assets.find((a) => a.id === scene.shot.stillAssetId)
     : null;
 
   if (!asset) {
@@ -146,7 +146,7 @@ export function renderPreview() {
   previewEl.innerHTML = '';
   if (!production || !scene) return;
 
-  const segments = assembleSegments(production, scene);
+  const segments = assembleSegments(production, scene, { assets: state.assets });
   if (segments.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-hint';

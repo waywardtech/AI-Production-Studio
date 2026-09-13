@@ -295,6 +295,11 @@ they have in common in `shared/`:
 
 ```
 shared/
+  store.js            every record and setting, one key each; change events
+  model.js            projects, prompts, replies, documents; statuses, tags
+  projects.js         the active project, and create/rename/delete
+  project-bar.js      the project switcher both pages show
+  migrate.js          brings data from earlier builds into projects
   modal.js            the one dialog both pages use
   ui.js               toasts, tab switching, clipboard, selection
   roundtrip.js        one trip through an open chat tab: send, wait, read
@@ -304,7 +309,7 @@ sidepanel/
   sidepanel.js        entry — wires the modules together and starts them
   lib/
     state.js          shared mutable panel state
-    storage.js        every chrome.storage read/write — the CORE-4 seam
+    storage.js        the panel's reads and writes, on shared/store.js
     blocks.js         block types: the palette and the Manage editor
     builder.js        the canvas, and everything that puts text into it
     library.js        saved prompts, tags and grouping
@@ -321,8 +326,8 @@ studio/
   lib/
     model.js          data shapes, block types, aspects, categories
     prompt.js         assembly, targets, profiles, requests, parsers
-    state.js          shared mutable page state
-    repository.js     every chrome.storage read/write — the CORE-4 seam
+    state.js          the active project's productions, assets, documents
+    repository.js     the studio's reads and writes, on shared/store.js
     render.js         the redraw registry the columns talk through
     files.js          reading dropped files; writing the report out
     scenes.js         the scene rail, sequences, and productions
@@ -337,9 +342,9 @@ studio/
 `variables.js` is deliberately dependency-free so it can be imported and
 tested outside a browser; `model.js` and `prompt.js` are the same, which
 is what makes the per-block preview cheap enough to recompute on every
-keystroke. `storage.js` and `studio/lib/repository.js` are the only
-places that talk to `chrome.storage`, which is what makes the Drive swap
-below a contained change rather than a sweep.
+keystroke. `shared/store.js` is the only place that talks to
+`chrome.storage` for durable data, so the pages never know or care
+whether a record came from this browser or from Google Drive.
 
 Neither page imports the other's code: what they share is in `shared/`.
 One dialog implementation, one toast, one send-and-scrape loop — a fix to
@@ -347,31 +352,30 @@ any of them lands in both surfaces.
 
 Tests live at the repo root in `tests/` and run with `npm test`.
 
-## What's stubbed and why (CORE-1 / CORE-4)
+## Projects and where data lives
 
-The Phase 0 tickets call for Google OAuth login and a Drive-backed
-repository. Both need a **Google Cloud project and OAuth client ID
-registered under your own Google account** — that's not something that
-can be generated on your behalf, it has to come from you.
+Everything belongs to a **project** — a client, a show, a campaign. The
+project bar at the top of both the side panel and the studio switches
+between them, and both pages always show the same one: choose "Apex" in
+the panel and the studio follows. Prompts, replies, productions, the
+asset pool and in-box/out-box documents all live inside a project; tags
+cut across them, and block types, usage figures and remembered variable
+values are shared by every project.
 
-So for this build, the prompt library, the saved replies, the block
-types and the remembered variable values all use the extension's own
-local storage (`chrome.storage.local`) instead. They work fully — save,
-load, filter, tag, delete — they just aren't synced to Drive yet, and
-they're scoped to this one browser profile.
+All of it is stored through one module, `shared/store.js`, one record
+per key in `chrome.storage.local`. That layout is deliberate: the side
+panel and the studio (or two studio tabs) each save their own records,
+so neither can overwrite the other's unrelated work. Every page follows
+changes made by the others as they happen.
 
-**To wire in the real thing later:**
-1. Create a project in Google Cloud Console, enable the Drive API
-2. Create an OAuth 2.0 Client ID (type: Chrome Extension), using this
-   extension's ID (visible on `chrome://extensions` once loaded)
-3. Add `identity` to `manifest.json` permissions and the client ID under
-   `oauth2`
-4. Rewrite `lib/storage.js` against the Drive API instead of
-   `chrome.storage.local` — nothing outside that file needs to change
+Data saved by builds before projects existed is migrated automatically
+the first time any page or the background worker starts: it lands in
+"My first project", and a copy of exactly what was there is kept under
+`es:backup:v1`.
 
-Everything else (blocks, tabs, injection, capture, fallback) doesn't
-need to change when that happens. Saved responses already carry the
-`source` link back to their conversation that CORE-4 expects.
+Google Docs — every document as a Doc in the project's Drive folder —
+is the next stage; until it's connected everything stays in this browser
+profile.
 
 ## Tab labels are per browser session
 

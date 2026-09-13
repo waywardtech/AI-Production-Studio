@@ -198,6 +198,7 @@ export async function refineScene(instruction) {
     text: buildRefineRequest(production, scene, instruction, {
       target: production.target,
       profile: production.profile,
+      assets: state.assets,
     }),
     title: 'Waiting for the refinement',
   });

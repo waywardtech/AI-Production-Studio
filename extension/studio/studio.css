@@ -30,12 +30,19 @@ body.studio {
 
 .brand {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 14px;
 }
 
-.brand .subtitle {
+.brand h1 {
+  flex: 0 0 auto;
+}
+
+/* In the wide header the project bar sits inline beside the name
+   rather than as its own boxed row the way the narrow panel shows it. */
+.brand .project-bar {
   margin: 0;
+  min-width: 260px;
 }
 
 .header-controls {

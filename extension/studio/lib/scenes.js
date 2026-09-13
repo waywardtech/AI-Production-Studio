@@ -5,9 +5,9 @@
 // makes "a page of a comic book" a thing you can hand off in one piece.
 
 import { state, activeProduction, activeScene } from './state.js';
-import { persist, persistNow } from './repository.js';
+import { createProduction, deleteProduction, persist, persistNow, setActiveProduction } from './repository.js';
 import { render, renderAll } from './render.js';
-import { STATUSES, duplicateScene, newId, newProduction, newScene, touch } from './model.js';
+import { STATUSES, duplicateScene, newId, newScene, touch } from './model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast } from '../../shared/ui.js';
 import { JOB_PROFILES, VIDEO_TARGETS, applyProfileDefaults, profileById } from './prompt.js';
@@ -310,13 +310,9 @@ async function newProductionFlow() {
   });
   if (values === null) return;
 
-  const production = newProduction(values.name.trim() || 'Untitled production');
-  state.productions.unshift(production);
-  state.activeProductionId = production.id;
-  state.activeSceneId = production.scenes[0].id;
-  await persistNow();
+  const production = await createProduction(values.name.trim() || 'Untitled production');
   renderAll();
-  showToast(`"${production.name}" created.`);
+  showToast(`"${production.name}" created in ${state.projectName}.`);
 }
 
 async function renameProductionFlow() {
@@ -339,19 +335,25 @@ async function renameProductionFlow() {
         label: 'Delete production',
         onClick: async ({ cancel }) => {
           cancel();
+          const renders = production.scenes.reduce((n, s) => n + s.renders.length, 0);
+          const docs = state.documents.filter((d) => d.productionId === production.id).length;
+          const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+          const parts = [plural(production.scenes.length, 'scene')];
+          if (renders) parts.push(plural(renders, 'recorded render'));
+          if (docs) parts.push(plural(docs, 'in-box/out-box document'));
+          const listed = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+          const verb = parts.length === 1 && production.scenes.length === 1 ? 'goes' : 'go';
           const confirmed = await openModal({
             title: `Delete "${production.name}"?`,
-            body: 'Every scene, asset reference and out-box entry in this production goes with it. This cannot be undone.',
+            body:
+              `Its ${listed} ${verb} with it. The asset pool stays — it belongs to ${state.projectName}, ` +
+              'not this production. This cannot be undone.',
             confirmLabel: 'Delete',
             danger: true,
           });
           if (confirmed === null) return;
 
-          state.productions = state.productions.filter((p) => p.id !== production.id);
-          if (state.productions.length === 0) state.productions = [newProduction('First production')];
-          state.activeProductionId = state.productions[0].id;
-          state.activeSceneId = state.productions[0].scenes[0]?.id || null;
-          await persistNow();
+          await deleteProduction(production.id);
           renderAll();
           showToast('Production deleted.');
         },
@@ -363,7 +365,8 @@ async function renameProductionFlow() {
   production.name = values.name.trim() || production.name;
   production.status = values.status;
   touch(production);
-  persist();
+  state.productions.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  persist(production);
   renderScenes();
 }
 
@@ -399,10 +402,7 @@ export function initScenes() {
   });
 
   productionSelectEl.addEventListener('change', async () => {
-    state.activeProductionId = productionSelectEl.value;
-    state.activeSceneId = activeProduction().scenes[0]?.id || null;
-    state.selectedBlockId = null;
-    await persistNow();
+    await setActiveProduction(productionSelectEl.value);
     renderAll();
   });
 
@@ -496,7 +496,7 @@ export function initScenes() {
       seq.sceneIds = seq.sceneIds.filter((id) => id !== scene.id);
     });
     touch(production);
-    await persistNow();
+    await persistNow(production);
     state.activeSceneId = production.scenes[0]?.id || null;
     renderAll();
     showToast('Scene deleted.');

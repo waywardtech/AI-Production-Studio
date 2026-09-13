@@ -7,9 +7,10 @@
 // hands-off rule as everywhere else in the suite.
 
 import { state, activeProduction, activeScene } from './state.js';
-import { persistNow } from './repository.js';
+import { persistNow, saveDocument } from './repository.js';
 import { render } from './render.js';
 import { newId, touch } from './model.js';
+import { newDocument } from '../../shared/model.js';
 import { assemblePrompt, buildProductionPrompt, profileById, targetById } from './prompt.js';
 import { refreshChatTabs } from './seed.js';
 import { openModal } from '../../shared/modal.js';
@@ -159,13 +160,13 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
   for (let i = 0; i < scenes.length; i += 1) {
     const scene = scenes[i];
     const isLast = i === scenes.length - 1;
-    let finalPrompt = withNotes(assemblePrompt(production, scene), notes);
+    let finalPrompt = withNotes(assemblePrompt(production, scene, { assets: state.assets }), notes);
 
     if (rewordTab) {
       const reply = await runRoundTrip({
         tabId: rewordTab.id,
         tabName: tabName(rewordTab),
-        text: withNotes(buildProductionPrompt(production, scene), notes),
+        text: withNotes(buildProductionPrompt(production, scene, { assets: state.assets }), notes),
         title: `Wording "${scene.name}" for ${target.label} (${i + 1} of ${scenes.length})`,
       });
       // A cancelled or empty round trip stops the run rather than
@@ -206,7 +207,7 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
     touch(scene);
     touch(production);
     produced += 1;
-    await persistNow();
+    await persistNow(production);
     render('scenes', 'drawer');
 
     if (isLast) break;
@@ -227,7 +228,7 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
     }
   }
 
-  await persistNow();
+  await persistNow(production);
   render('scenes', 'drawer');
 
   if (produced === 0) return;
@@ -247,7 +248,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString();
 }
 
-export function buildDailiesReport(production) {
+export function buildDailiesReport(production, assets = []) {
   const renders = production.scenes.flatMap((scene) =>
     scene.renders.map((entry) => ({ ...entry, scene }))
   );
@@ -304,7 +305,7 @@ export function buildDailiesReport(production) {
   const referenced = new Set(production.scenes.flatMap((s) => s.assetIds));
   if (referenced.size) {
     lines.push('## References used', '');
-    production.assets
+    assets
       .filter((a) => referenced.has(a.id))
       .forEach((asset) => {
         lines.push(`- **${asset.name}** (${asset.category})${asset.sourceUrl ? ` — ${asset.sourceUrl}` : ''}`);
@@ -319,16 +320,19 @@ export async function fileDailiesReport() {
   const production = activeProduction();
   if (!production) return;
 
-  const body = buildDailiesReport(production);
-  production.outbox.unshift({
-    id: newId('out'),
-    kind: 'report',
-    title: `Dailies — ${new Date().toLocaleDateString()}`,
-    body,
-    at: new Date().toISOString(),
-  });
-  touch(production);
-  await persistNow();
+  const body = buildDailiesReport(production, state.assets);
+  // Filed as a document in the production's out-box — with Google Docs
+  // connected, a Google Doc in its Out-box folder.
+  await saveDocument(
+    newDocument({
+      projectId: state.projectId,
+      productionId: production.id,
+      box: 'outbox',
+      kind: 'report',
+      title: `Dailies — ${production.name} — ${new Date().toLocaleDateString()}`,
+      text: body,
+    })
+  );
   render('drawer');
   showToast('Dailies report filed in the out-box.');
   return body;

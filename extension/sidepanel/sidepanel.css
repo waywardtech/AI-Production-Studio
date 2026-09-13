@@ -820,3 +820,50 @@ button.danger {
 .cost-chip.warning .cost-bar-fill {
   background: #d4544a;
 }
+
+/* ---------- App header + project bar (shared by both pages) ---------- */
+
+.app-header {
+  margin-bottom: 4px;
+}
+
+.brand-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  padding: 6px 8px;
+  border: 1px solid #2b2d34;
+  border-radius: 8px;
+  background: #1c1d22;
+}
+
+.project-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8d8f99;
+}
+
+.project-select {
+  flex: 1;
+  min-width: 0;
+  background: #14151a;
+  color: #e7e7ea;
+  border: 1px solid #3a3c45;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.project-bar .link-btn {
+  white-space: nowrap;
+}

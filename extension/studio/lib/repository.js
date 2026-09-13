@@ -1,72 +1,155 @@
-// Every read and write the studio page makes.
+// The studio's data access, on top of the shared record store.
 //
-// This is the same CORE-4 seam the side panel's storage.js is: swapping
-// these for Drive API calls is what wires the real repository in, and
-// nothing outside this file needs to change when that happens. Until
-// then productions live in chrome.storage.local — which is why the
-// manifest asks for unlimitedStorage: thumbnails add up.
+// A production, each asset and each document is its own record, so
+// typing in a scene rewrites one production — not the whole asset pool
+// with its thumbnails, and not every other production in the project.
+//
+// Writes to a production are coalesced: typing in a block would
+// otherwise hit storage on every keystroke. Anything that must be on
+// disk before the page could close (creating or deleting, filing to the
+// out-box) awaits persistNow() directly.
 
-import { state } from './state.js';
+import { state, activeProduction } from './state.js';
 import { newProduction } from './model.js';
+import { getSetting, list, put, putMany, remove, updateSetting } from '../../shared/store.js';
 
-const PRODUCTIONS_KEY = 'productions';
-const ACTIVE_KEY = 'activeProductionId';
+// ---------- loading ----------
 
-export async function loadProductions() {
-  const stored = await chrome.storage.local.get([PRODUCTIONS_KEY, ACTIVE_KEY]);
-  state.productions = (stored[PRODUCTIONS_KEY] || []).map(tidyProduction);
-
-  if (state.productions.length === 0) {
-    state.productions = [newProduction('First production')];
-    await persistNow();
-  }
-
-  const wanted = stored[ACTIVE_KEY];
-  state.activeProductionId = state.productions.some((p) => p.id === wanted)
-    ? wanted
-    : state.productions[0].id;
-
-  const production = state.productions.find((p) => p.id === state.activeProductionId);
-  state.activeSceneId = production.scenes[0]?.id || null;
-}
-
-// Earlier builds filed a { kind: 'clip' } copy of every render into the
-// out-box as well as on its scene. The out-box has always listed renders
-// straight off their scenes, so those copies were never shown, never
-// updated past the first link, and outlived their scenes when a scene
-// was deleted. They're dropped on load; filed reports are kept.
+// Productions saved before the out-box stopped keeping per-clip copies,
+// or before assets and boxes moved out of the production, are tidied as
+// they load. The migration already does this; this catches anything
+// written by an older build since.
 function tidyProduction(production) {
-  if (Array.isArray(production.outbox)) {
-    production.outbox = production.outbox.filter((item) => item.kind !== 'clip');
-  }
+  delete production.assets;
+  delete production.inbox;
+  delete production.outbox;
+  production.sequences = production.sequences || [];
+  production.scenes = production.scenes || [];
   return production;
 }
 
-export async function persistNow() {
-  clearTimeout(pending);
-  pending = null;
-  await chrome.storage.local.set({
-    [PRODUCTIONS_KEY]: state.productions,
-    [ACTIVE_KEY]: state.activeProductionId,
-  });
+export async function loadProject(project) {
+  // Anything typed in the project being left (or renamed) is written
+  // before its data is reloaded, not dropped.
+  await persistNow();
+  state.projectId = project.id;
+  state.projectName = project.name;
+
+  let productions = (await list('productions', { projectId: project.id })).map(tidyProduction);
+  if (productions.length === 0) {
+    const first = newProduction({ projectId: project.id, name: 'First production' });
+    await put('productions', first);
+    productions = [first];
+  }
+  state.productions = productions.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  state.assets = await list('assets', { projectId: project.id });
+  state.documents = await list('documents', { projectId: project.id });
+
+  const app = (await getSetting('app', {})) || {};
+  const remembered = state.productions.find((p) => p.id === app.activeProductionId);
+  selectProductionLocally((remembered || state.productions[0]).id);
 }
 
-// Typing in a block textarea writes on every keystroke, so the actual
-// storage call is coalesced. Anything that must be on disk before the
-// page can be closed — deleting a production, filing to the out-box —
-// awaits persistNow directly.
+function selectProductionLocally(productionId) {
+  state.activeProductionId = productionId;
+  state.activeSceneId = activeProduction()?.scenes[0]?.id || null;
+  state.selectedBlockId = null;
+}
+
+export async function setActiveProduction(productionId) {
+  await persistNow();
+  selectProductionLocally(productionId);
+  await updateSetting('app', { activeProductionId: productionId });
+}
+
+// ---------- productions ----------
+
+const dirty = new Set();
 let pending = null;
 
-export function persist() {
+// Marks a production as changed and schedules the write. Defaults to the
+// active production, which is what nearly every edit touches.
+export function persist(production = activeProduction()) {
+  if (production) dirty.add(production);
   clearTimeout(pending);
   pending = setTimeout(() => {
     persistNow().catch((err) => console.error('[Edge Studio] Save failed:', err));
   }, 300);
 }
 
+export async function persistNow(production = null) {
+  if (production) dirty.add(production);
+  clearTimeout(pending);
+  pending = null;
+  const due = [...dirty];
+  dirty.clear();
+  for (const item of due) await put('productions', item);
+}
+
 // Closing the tab inside the debounce window used to drop the last
 // keystrokes. The write is started as the page goes away; extension
 // storage calls made during pagehide still complete.
 window.addEventListener('pagehide', () => {
-  if (pending) persistNow().catch(() => {});
+  if (dirty.size) persistNow().catch(() => {});
 });
+
+export function hasUnsavedChanges(productionId) {
+  return [...dirty].some((p) => p.id === productionId);
+}
+
+export async function createProduction(name) {
+  await persistNow();
+  const production = newProduction({ projectId: state.projectId, name });
+  await put('productions', production);
+  state.productions.push(production);
+  state.productions.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  await setActiveProduction(production.id);
+  return production;
+}
+
+// Takes the production's own documents with it. Assets stay — they
+// belong to the project, and other productions may use them.
+export async function deleteProduction(productionId) {
+  await persistNow();
+  const owned = state.documents.filter((d) => d.productionId === productionId);
+  for (const doc of owned) await remove('documents', doc.id);
+  await remove('productions', productionId);
+
+  state.documents = state.documents.filter((d) => d.productionId !== productionId);
+  state.productions = state.productions.filter((p) => p.id !== productionId);
+
+  if (state.productions.length === 0) {
+    const replacement = newProduction({ projectId: state.projectId, name: 'First production' });
+    await put('productions', replacement);
+    state.productions = [replacement];
+  }
+  await setActiveProduction(state.productions[0].id);
+}
+
+// ---------- assets (per project) ----------
+
+export async function saveAsset(asset) {
+  return put('assets', asset);
+}
+
+export async function saveAssets(assets) {
+  return putMany('assets', assets);
+}
+
+export async function deleteAsset(assetId) {
+  await remove('assets', assetId);
+  state.assets = state.assets.filter((a) => a.id !== assetId);
+}
+
+// ---------- documents (per production) ----------
+
+export async function saveDocument(doc) {
+  const saved = await put('documents', doc);
+  if (!state.documents.includes(doc)) state.documents.unshift(doc);
+  return saved;
+}
+
+export async function deleteDocument(docId) {
+  await remove('documents', docId);
+  state.documents = state.documents.filter((d) => d.id !== docId);
+}

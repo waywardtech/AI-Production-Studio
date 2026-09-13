@@ -1,54 +1,52 @@
-// Every read and write the panel makes.
+// The side panel's data access, on top of the shared record store.
 //
-// This is the CORE-4 seam: swapping these for Drive API calls is what
-// wires the real repository in, and nothing outside this file needs to
-// change when that happens.
+// Everything durable goes through shared/store.js, so the panel, the
+// studio and (once connected) Google Drive all see the same records.
+// What stays here is only what's genuinely the panel's own: tab labels,
+// which are per browser session.
 
-export async function getLibrary() {
-  const { library } = await chrome.storage.local.get('library');
-  return library || [];
-}
+import { getSetting, list, put, remove, setSetting, updateSetting } from '../../shared/store.js';
 
-export async function saveLibrary(library) {
-  await chrome.storage.local.set({ library });
-}
+// ---------- prompts and replies (per project) ----------
 
-export async function getResponses() {
-  const { responses } = await chrome.storage.local.get('responses');
-  return responses || [];
-}
+export const listPrompts = (projectId) => list('prompts', { projectId });
+export const savePrompt = (record) => put('prompts', record);
+export const deletePrompt = (id) => remove('prompts', id);
 
-export async function saveResponses(responses) {
-  await chrome.storage.local.set({ responses });
-}
+export const listReplies = (projectId) => list('replies', { projectId });
+export const saveReply = (record) => put('replies', record);
+export const deleteReply = (id) => remove('replies', id);
+
+// ---------- settings (across projects) ----------
 
 export async function getStoredBlockTypes() {
-  const { blockTypes } = await chrome.storage.local.get('blockTypes');
-  return blockTypes || null;
+  const app = (await getSetting('app', {})) || {};
+  return app.blockTypes && app.blockTypes.length ? app.blockTypes : null;
 }
 
 export async function saveBlockTypes(blockTypes) {
-  await chrome.storage.local.set({ blockTypes });
-}
-
-export async function getUsage() {
-  const { usage } = await chrome.storage.local.get('usage');
-  return usage || null;
-}
-
-export async function saveUsage(usage) {
-  await chrome.storage.local.set({ usage });
+  await updateSetting('app', { blockTypes });
 }
 
 export async function getRememberedValues() {
-  const { variableValues } = await chrome.storage.local.get('variableValues');
-  return variableValues || {};
+  const variables = (await getSetting('variables', {})) || {};
+  return variables.values || {};
 }
 
-export async function saveRememberedValues(variableValues) {
-  await chrome.storage.local.set({ variableValues });
+export async function saveRememberedValues(values) {
+  await updateSetting('variables', { values });
 }
 
+export async function getUsage() {
+  return getSetting('usage', null);
+}
+
+export async function saveUsage(usage) {
+  await setSetting('usage', usage);
+}
+
+// ---------- tab labels (per browser session) ----------
+//
 // Tab labels live in storage.session, not storage.local, and that's
 // deliberate. They're keyed by Chrome tab ID, and tab IDs are only
 // unique within a single browser session — Chrome hands the same IDs
@@ -57,8 +55,7 @@ export async function saveRememberedValues(variableValues) {
 // 42 tomorrow, quietly mislabelling a destination. storage.session is
 // cleared when the browser closes, which matches M1-6's "labels persist
 // per tab session" acceptance criterion exactly and makes the ID reuse
-// unreachable. (Labels that survive a restart would need a stable key
-// such as the conversation URL — that's a feature, not this fix.)
+// unreachable.
 
 export async function getTabLabels() {
   const { tabLabels } = await chrome.storage.session.get('tabLabels');

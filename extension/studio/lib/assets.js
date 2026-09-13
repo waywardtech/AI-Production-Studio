@@ -1,12 +1,13 @@
 // Column 1 — asset discovery, customization and creation (M4-4/M4-5).
 //
-// One pool per production. Ticking a tile attaches that asset to the
-// current scene, which is what stops the same location and character
+// One pool per project, shared by every production in it — a character
+// or a location is reused across productions, not rebuilt for each.
+// Clicking a tile attaches that asset to the current scene, which is what stops the same location and character
 // being re-described in every shot; double-clicking a picture promotes
 // it to the shot's opening still.
 
 import { state, activeProduction, activeScene } from './state.js';
-import { persist } from './repository.js';
+import { deleteAsset, persist, saveAsset, saveAssets } from './repository.js';
 import { render } from './render.js';
 import { ASSET_CATEGORIES, categoryLabel, newAsset, touch } from './model.js';
 import { openModal } from '../../shared/modal.js';
@@ -20,11 +21,9 @@ const countEl = document.getElementById('asset-count');
 const fileInputEl = document.getElementById('asset-file-input');
 
 export function visibleAssets() {
-  const production = activeProduction();
-  if (!production) return [];
   const query = state.assetQuery.trim().toLowerCase();
 
-  return production.assets.filter((asset) => {
+  return state.assets.filter((asset) => {
     if (state.assetCategory && asset.category !== state.assetCategory) return false;
     if (!query) return true;
     return [asset.name, asset.description, asset.category, ...(asset.tags || [])]
@@ -35,12 +34,9 @@ export function visibleAssets() {
 }
 
 export function addAssets(assets) {
-  const production = activeProduction();
-  if (!production) return [];
-  const created = assets.map((fields) => newAsset(fields));
-  production.assets.unshift(...created);
-  touch(production);
-  persist();
+  const created = assets.map((fields) => newAsset({ ...fields, projectId: state.projectId }));
+  state.assets.unshift(...created);
+  saveAssets(created).catch((err) => console.error('[Edge Studio] Saving assets failed:', err));
   render('assets');
   return created;
 }
@@ -71,7 +67,6 @@ function setStill(assetId) {
 }
 
 async function editAsset(asset) {
-  const production = activeProduction();
   const values = await openModal({
     title: 'Edit asset',
     fields: [
@@ -93,13 +88,21 @@ async function editAsset(asset) {
         label: 'Delete',
         onClick: async ({ cancel }) => {
           cancel();
-          const usedIn = production.scenes.filter((scene) => scene.assetIds.includes(asset.id));
-          const asStill = usedIn.filter((scene) => scene.shot.stillAssetId === asset.id).length;
+          // Assets are project-wide, so it can be in use across several
+          // productions, not just this one.
+          const usedIn = state.productions.flatMap((production) =>
+            production.scenes
+              .filter((scene) => scene.assetIds.includes(asset.id))
+              .map((scene) => ({ production, scene }))
+          );
+          const asStill = usedIn.filter(({ scene }) => scene.shot.stillAssetId === asset.id).length;
+          const productionCount = new Set(usedIn.map(({ production }) => production.id)).size;
           const confirmed = await openModal({
             title: `Delete "${asset.name}"?`,
             body:
               (usedIn.length
                 ? `It's attached to ${usedIn.length} scene${usedIn.length === 1 ? '' : 's'}` +
+                  (productionCount > 1 ? ` across ${productionCount} productions` : '') +
                   (asStill ? ` and is the opening frame of ${asStill}` : '') +
                   ', and comes out of all of them. '
                 : '') + 'This cannot be undone.',
@@ -108,14 +111,13 @@ async function editAsset(asset) {
           });
           if (confirmed === null) return;
 
-          production.assets = production.assets.filter((a) => a.id !== asset.id);
-          usedIn.forEach((scene) => {
+          usedIn.forEach(({ production, scene }) => {
             scene.assetIds = scene.assetIds.filter((id) => id !== asset.id);
             if (scene.shot.stillAssetId === asset.id) scene.shot.stillAssetId = null;
             touch(scene);
+            persist(production);
           });
-          touch(production);
-          persist();
+          await deleteAsset(asset.id);
           render('assets', 'shot');
           showToast(`Deleted "${asset.name}".`);
         },
@@ -134,8 +136,7 @@ async function editAsset(asset) {
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean),
   });
-  touch(production);
-  persist();
+  await saveAsset(asset);
   render('assets', 'shot');
 }
 
@@ -241,23 +242,20 @@ function assetTile(asset) {
 }
 
 export function renderAssets() {
-  const production = activeProduction();
   const assets = visibleAssets();
   const scene = activeScene();
 
-  countEl.textContent = production
-    ? `${scene ? scene.assetIds.length : 0} attached · ${production.assets.length} in pool`
-    : '';
+  countEl.textContent = `${scene ? scene.assetIds.length : 0} attached · ${state.assets.length} in ${state.projectName || 'the project'}`;
 
   // Category chips, with counts, so an empty category is obvious
   // before it's clicked.
   categoriesEl.innerHTML = '';
   const counts = new Map();
-  (production?.assets || []).forEach((a) => counts.set(a.category, (counts.get(a.category) || 0) + 1));
+  state.assets.forEach((a) => counts.set(a.category, (counts.get(a.category) || 0) + 1));
 
   const allChip = document.createElement('button');
   allChip.className = `tag-chip filter${state.assetCategory === null ? ' active' : ''}`;
-  allChip.textContent = `All ${production ? production.assets.length : 0}`;
+  allChip.textContent = `All ${state.assets.length}`;
   allChip.addEventListener('click', () => {
     state.assetCategory = null;
     renderAssets();
@@ -279,7 +277,7 @@ export function renderAssets() {
   if (assets.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-hint';
-    empty.textContent = production && production.assets.length
+    empty.textContent = state.assets.length
       ? 'Nothing matches that search.'
       : 'No assets yet. Upload one, add it from a URL, or describe one that does not exist yet.';
     gridEl.appendChild(empty);
