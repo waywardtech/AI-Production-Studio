@@ -6,7 +6,7 @@
 // being re-described in every shot; double-clicking a picture promotes
 // it to the shot's opening still.
 
-import { state, activeProduction, activeScene } from './state.js';
+import { state, activeScene } from './state.js';
 import { deleteAsset, persist, saveAsset, saveAssets } from './repository.js';
 import { render } from './render.js';
 import { ASSET_CATEGORIES, categoryLabel, newAsset, touch } from './model.js';
