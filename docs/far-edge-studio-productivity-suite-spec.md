@@ -419,6 +419,10 @@ Per the "don't reinvent the wheel" principle in §8, here's what's actually out 
 | 16 | Google access | `drive.file` + `drive.appdata` only, via a Web-application OAuth client ID entered in Settings |
 | 17 | Asset scope | Assets belong to the project and are shared by all its productions |
 | 18 | Produce pacing | One shot at a time, waiting for Dan to send each; rewording happens in a separate chat, never the generator tab |
+| 19 | Asset file bytes | Held in IndexedDB in the browser and mirrored to `Edge Studio/<Project>/Assets`; records keep a reference only. Files over 50 MB stay a reference and can't be attached — the limit is what Chrome's message passing can carry to a content script |
+| 20 | Importing from Drive | A built-in folder browser on the Drive REST API, behind its own `drive.readonly` grant turned on in Settings. Google's Picker needs remotely hosted code, which MV3 forbids in an extension page |
+| 21 | Drive asset folder | `Edge Studio/<Project>/Assets`, created by the extension. Pointing a project at a folder it didn't create would need the full `drive` scope |
+| 22 | Attaching files to a chat | Handed to the page's own file input, or failing that a paste or drop on the composer. Never sent — files wait in the composer with the prompt, same rule as the text |
 
 *No open questions remain. Decisions 15–18 were made while building Core and reworking the suite for coherence; the extension README describes the result.*
 

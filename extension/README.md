@@ -121,8 +121,8 @@ the reply's text box, or the whole reply if nothing is.
  Alpha   │ search, categories │ seed              │ still
  Bravo   │ click to attach    │ Location          │ time of day · look
  Charlie │ ☆ = opening frame  │ Setting           │ lighting · exposure
- Seq. A  │ upload / URL /     │ Scene / Action    │ refine
-         │ describe           │ + add block       │ preview → Save to prompts
+ Seq. A  │ upload / Drive /   │ Scene / Action    │ refine
+         │ URL / describe     │ + add block       │ preview → Save to prompts
 ```
 
 A project holds any number of productions (header: Production, **+ New**,
@@ -144,24 +144,56 @@ social vertical, establishing, dialogue two-shot, action beat, insert.
 A profile fills its settings (duration, aspect ratio, what to avoid) into
 every scene, replacing only values a profile set; anything you typed stays.
 
-**Scripts and material.** Drop text files or images anywhere on the page:
-text lands in the in-box, images join the asset pool as thumbnails and
-references. **Scenes from script…** turns a script or a comic page into
-scenes; **Import material…** reads characters, locations, wardrobe and so
-on from JSON directly (a list, `{assets:[…]}` or `{characters:[…]}`) or
-from notes via a chat.
+**Scripts and material.** Drop anything anywhere on the page: scripts and
+notes land in the in-box as text, and images, clips, audio, PDFs and
+documents join the asset pool. **Scenes from script…** turns a script or a
+comic page into scenes; **Import material…** reads characters, locations,
+wardrobe and so on from JSON directly (a list, `{assets:[…]}` or
+`{characters:[…]}`) or from notes via a chat.
+
+**Files.** An imported file's bytes are kept in this browser so they can be
+sent to a chat later, and mirrored to `Edge Studio/<Project>/Assets` in
+Drive. The tile badge says what a file is and whether it's actually here:
+an outlined badge means reference only — either over the 50 MB limit, or
+imported on another machine, in which case ✎ offers **Fetch file**.
+
+**From Drive** browses the Drive you already have — walk folders, search by
+name, tick what you want. Google Docs come across as text into the in-box;
+everything else joins the asset pool with a link back to Drive. This reads
+files Edge Studio didn't create, so it needs its own permission: turn on
+**Allow Drive browsing** in Settings first.
 
 **Produce.** Choose the scope (this scene, a sequence, every scene), the
 generator tab, and optionally a *separate* chat to reword each shot for
 the generator first — never the generator tab itself, which would spend
-its quota. Each shot is written into the generator's input box and the run
-**waits** for you to send it before the next one replaces it. Stopping
+its quota. If the shots have reference files behind them, **attach each
+shot's reference files** sends them into the tab too — the still first,
+then the rest. Each shot is written into the generator's input box and the
+run **waits** for you to send it before the next one replaces it. Stopping
 records only what was actually sent.
 
 **Review.** The out-box lists every render with its exact prompt: paste
 the clip's link, keep / reject, or **Regenerate** with a note that's
 carried into the next attempt. **File dailies report** writes the lot up —
 filed in the out-box, downloadable, and a Google Doc when connected.
+
+## Sending files with a prompt
+
+The studio attaches a shot's own references automatically. From the side
+panel, **Attach files…** picks from the project's files by hand; the line
+under the builder says what will go, and **Insert** sends the prompt and
+the files into each ticked tab. The choice is per prompt — a successful
+insert clears it.
+
+Files go to the page's own file input where there is one, otherwise as a
+paste or a drop on the composer. As with the text, **nothing is sent**:
+the files wait in the composer with the prompt. A file that isn't on this
+machine, or is over the size limit, is listed but can't be ticked, so the
+reason is visible before you try.
+
+These selectors have not been checked against the live sites yet. If a
+page has nowhere to put a file, the toast says so and the prompt is still
+in the box to attach by hand.
 
 ## Usage
 
@@ -182,6 +214,7 @@ Edge Studio/
   <Project>/
     Prompts/          a Doc per saved prompt — edit the text under each [Heading]
     Replies/          a Doc per saved reply
+    Assets/           the image, clip or document behind each asset
     Productions/
       <Production>/   its shot list (generated from the studio)
         In-box/       a Doc per script or note
@@ -215,7 +248,16 @@ and shows the exact values to copy:
 
 Edge Studio asks for `drive.file` (only files it creates — never the rest
 of your Drive) and `drive.appdata` (its hidden index). Neither is a
-sensitive scope, so there's no Google review. Access tokens live in
+sensitive scope, so there's no Google review.
+
+**Importing from your own Drive is a separate permission.** `drive.file`
+can't see a file Edge Studio didn't create, so browsing your Drive needs
+`drive.readonly`, asked for only when you turn on **Allow Drive browsing**
+in Settings and used only to read the files you pick. Google classes it as
+restricted: fine while your OAuth app stays in **Testing** with you as the
+test user, but publishing it would need Google's review. Turning it off
+stops Edge Studio asking for it; Google keeps the grant until you
+Disconnect, which revokes everything. Access tokens live in
 session storage only. The extension ID comes from the folder Edge Studio
 is loaded from, so loading it from somewhere else changes the redirect URI;
 Settings always shows the current one.

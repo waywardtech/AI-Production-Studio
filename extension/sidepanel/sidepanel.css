@@ -950,3 +950,59 @@ button.danger {
   font-style: normal;
   color: #e7e7ea;
 }
+
+/* ---------- M5-4: files chosen for the next Insert ---------- */
+
+#attachment-line {
+  margin: 6px 0 0;
+  color: #7fa8ff;
+}
+
+#attachment-line.hidden,
+#clear-attachments-btn.hidden {
+  display: none;
+}
+
+.attach-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  padding: 4px;
+  background: #14151a;
+  margin-bottom: 8px;
+}
+
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.attach-row:hover {
+  background: #1c1d22;
+}
+
+/* A file that isn't on this machine can't be handed to a chat; it stays
+   listed so its absence is visible rather than mysterious. */
+.attach-row.unavailable {
+  cursor: default;
+  color: #6f7178;
+}
+
+.attach-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-meta {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #6f7178;
+}

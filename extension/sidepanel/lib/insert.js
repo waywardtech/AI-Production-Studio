@@ -7,6 +7,8 @@ import { getRememberedValues, saveRememberedValues } from './storage.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
 import { assembledPrompt } from './builder.js';
+import { chosenAttachments, clearAttachments } from './attachments.js';
+import { describeAttachment, sendFilesToTab } from '../../shared/attach.js';
 
 // Last-used values are remembered per variable name and prefilled the
 // next time that name comes up. Most of Dan's variables (a client name,
@@ -64,8 +66,12 @@ async function runInsert() {
     return;
   }
 
+  const attachments = await chosenAttachments();
+
   let successCount = 0;
   let fallbackCount = 0;
+  let attachedCount = 0;
+  let attachFailure = null;
 
   for (const tabId of state.selectedTabIds) {
     const result = await chrome.runtime.sendMessage({
@@ -81,10 +87,27 @@ async function runInsert() {
       fallbackCount += 1;
       await copyToClipboard(text);
     }
+
+    // Files follow the text into the same tab. A tab that couldn't take
+    // the prompt won't take the files either, so don't try.
+    if (attachments.ready.length && result && result.success) {
+      const attached = await sendFilesToTab(tabId, attachments.ready);
+      if (attached.success) attachedCount += 1;
+      else attachFailure = describeAttachment(attached, attachments);
+    }
   }
 
-  if (successCount && !fallbackCount) {
-    showToast(`Inserted into ${successCount} tab(s).`);
+  // The attachment picking is per prompt, not a standing setting, so a
+  // successful insert clears it rather than quietly repeating itself.
+  if (attachments.ready.length && attachedCount) clearAttachments();
+
+  if (attachFailure) {
+    showToast(attachFailure, 'warning');
+  } else if (successCount && !fallbackCount) {
+    const files = attachedCount
+      ? ` with ${attachments.ready.length} file${attachments.ready.length === 1 ? '' : 's'}`
+      : '';
+    showToast(`Inserted into ${successCount} tab(s)${files}.`);
   } else if (successCount && fallbackCount) {
     showToast(
       `Inserted into ${successCount} tab(s). ${fallbackCount} couldn't auto-insert — copied to clipboard, paste manually.`,

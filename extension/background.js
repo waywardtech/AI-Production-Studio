@@ -362,4 +362,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     relayToTab(message.tabId, { type: message.type }).then(sendResponse);
     return true;
   }
+
+  // --- M5-4: attachment relays ---
+  // Passed through whole: the worker is a postbox for these, and the
+  // chunks are only meaningful to the content script assembling them.
+  if (
+    message.type === 'EDGE_STUDIO_ATTACH_BEGIN' ||
+    message.type === 'EDGE_STUDIO_ATTACH_CHUNK' ||
+    message.type === 'EDGE_STUDIO_ATTACH_COMMIT'
+  ) {
+    const { tabId, ...rest } = message;
+    relayToTab(tabId, rest).then(sendResponse);
+    return true;
+  }
 });

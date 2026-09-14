@@ -15,6 +15,7 @@ import { assemblePrompt, buildProductionPrompt, profileById, targetById } from '
 import { refreshChatTabs } from './seed.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
+import { attachableFiles, describeAttachment, sendFilesToTab } from '../../shared/attach.js';
 import { runRoundTrip, sendToTab, unfence } from '../../shared/roundtrip.js';
 import { isChatTab, tabName } from '../../shared/tabs.js';
 
@@ -38,6 +39,45 @@ function scenesInScope(production, scope) {
 function withNotes(promptText, notes) {
   if (!notes) return promptText;
   return `${promptText}\n\nChanges wanted from the last attempt: ${notes}`;
+}
+
+// A scene's files, still first — it's the frame the shot is built from,
+// and the order files arrive in is the order these sites show them.
+async function sceneFiles(scene) {
+  const ids = [scene.shot.stillAssetId, ...scene.assetIds].filter(Boolean);
+  const seen = new Set();
+  const assets = [];
+  ids.forEach((id) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const asset = state.assets.find((a) => a.id === id);
+    if (asset) assets.push(asset);
+  });
+  return attachableFiles(assets);
+}
+
+// Adds the attach checkbox to the dialog if any shot in scope has files
+// behind it, and reports how many there are.
+async function attachableAssetCount(production, sceneIds, fields) {
+  const scenes = sceneIds
+    ? sceneIds.map((id) => production.scenes.find((s) => s.id === id)).filter(Boolean)
+    : production.scenes;
+
+  const ids = new Set();
+  scenes.forEach((scene) => {
+    [scene.shot.stillAssetId, ...scene.assetIds].filter(Boolean).forEach((id) => ids.add(id));
+  });
+
+  const { ready } = await attachableFiles([...ids].map((id) => state.assets.find((a) => a.id === id)).filter(Boolean));
+  if (ready.length === 0) return 0;
+
+  fields.push({
+    name: 'attach',
+    label: `Attach each shot's reference files (${ready.length} available)`,
+    type: 'checkbox',
+    value: true,
+  });
+  return ready.length;
 }
 
 export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
@@ -112,6 +152,11 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
     }
   );
 
+  // What could actually go with the shots in scope. Offered only when
+  // there is something to send, so the dialog doesn't carry a dead
+  // control for a production with no reference files.
+  const attachable = await attachableAssetCount(production, sceneIds, fields);
+
   const setup = await openModal({
     title: sceneIds ? `Regenerate for ${target.label}` : `Produce for ${target.label}`,
     hint:
@@ -136,6 +181,8 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
     destinationTabId: destination.id,
     rewordTabId: rewordTab ? rewordTab.id : 'none',
   };
+
+  const attachFiles = attachable > 0 && setup.attach !== false;
 
   const scenes = sceneIds
     ? sceneIds.map((id) => production.scenes.find((s) => s.id === id)).filter(Boolean)
@@ -178,6 +225,17 @@ export async function produceScenes({ sceneIds = null, notes = '' } = {}) {
         showToast(`Couldn't write "${scene.name}" into that tab or onto the clipboard.`, 'warning');
         stoppedEarly = true;
         break;
+      }
+    }
+
+    // The shot's own references, alongside the prompt that describes
+    // them. A failure here doesn't stop the run: the prompt is already
+    // in the box, and Dan can attach by hand.
+    if (attachFiles) {
+      const files = await sceneFiles(scene);
+      if (files.ready.length) {
+        const result = await sendFilesToTab(destination.id, files.ready);
+        showToast(describeAttachment(result, files), result.success ? 'success' : 'warning');
       }
     }
 

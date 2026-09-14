@@ -116,4 +116,31 @@ console.log('--- what a file is ---');
   eq(big.tooLarge, true, 'an oversized file is marked before anything tries to store it');
 }
 
+console.log('--- the attachment transfer ---');
+{
+  // attach.js talks to chrome.runtime; only its encoding half is pure,
+  // and that is the half that would corrupt a file if it were wrong.
+  globalThis.btoa = (binary) => Buffer.from(binary, 'binary').toString('base64');
+  const attach = await import(new URL('shared/attach.js', EXTENSION));
+
+  const roundTrip = (bytes) => {
+    const encoded = attach.bytesToBase64(new Uint8Array(bytes));
+    return [...Buffer.from(encoded, 'base64')];
+  };
+
+  eq(roundTrip([]), [], 'an empty file encodes to nothing');
+  eq(roundTrip([0, 1, 254, 255]), [0, 1, 254, 255], 'byte values survive, including 0 and 255');
+
+  // The encoder walks the array in windows; the bug it guards against
+  // only shows up past one window, so check either side of the seam.
+  const long = Array.from({ length: 8192 * 2 + 5 }, (_, i) => i % 256);
+  eq(roundTrip(long), long, 'a file longer than the encode window survives intact');
+
+  eq(attach.chunkCount(0), 0, 'an empty file needs no chunks');
+  eq(attach.chunkCount(1), 1, 'a single byte is one chunk');
+  eq(attach.chunkCount(1.5 * 1024 * 1024), 1, 'exactly one chunk stays one');
+  eq(attach.chunkCount(1.5 * 1024 * 1024 + 1), 2, 'a byte over spills into a second');
+  eq(attach.chunkCount(MAX_STORED_BYTES), 34, 'the largest storable file is ~34 messages, not hundreds');
+}
+
 done();

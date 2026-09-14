@@ -19,6 +19,7 @@ const PLATFORMS = [
     label: 'ChatGPT',
     hosts: ['chatgpt.com', 'chat.openai.com'],
     inputSelectors: ['#prompt-textarea', 'div[contenteditable="true"]', 'textarea'],
+    fileInputSelectors: ['input[type="file"][multiple]', 'input[type="file"]'],
     assistantSelectors: ['[data-message-author-role="assistant"]'],
     // Whole conversation turns, minus the ones marked as the user's.
     assistantFallback: () =>
@@ -36,6 +37,7 @@ const PLATFORMS = [
       'div[contenteditable="true"]',
       'textarea',
     ],
+    fileInputSelectors: ['input[type="file"][data-testid*="file"]', 'input[type="file"]'],
     assistantSelectors: [
       '[data-testid="assistant-message"]',
       '.font-claude-message',
@@ -54,6 +56,7 @@ const PLATFORMS = [
       'div[contenteditable="true"]',
       'textarea',
     ],
+    fileInputSelectors: ['input[type="file"]'],
     assistantSelectors: ['model-response', 'message-content.model-response-text', '.model-response-text'],
     assistantFallback: null,
   },
@@ -69,6 +72,7 @@ const PLATFORMS = [
     kind: 'generator',
     hosts: ['sora.chatgpt.com'],
     inputSelectors: ['textarea', 'div[contenteditable="true"]'],
+    fileInputSelectors: ['input[type="file"]'],
     assistantSelectors: [],
     assistantFallback: null,
   },
@@ -78,6 +82,7 @@ const PLATFORMS = [
     kind: 'generator',
     hosts: ['labs.google'],
     inputSelectors: ['textarea', 'div[contenteditable="true"]'],
+    fileInputSelectors: ['input[type="file"]'],
     assistantSelectors: [],
     assistantFallback: null,
   },
@@ -151,6 +156,143 @@ function injectPrompt(text) {
   } catch (error) {
     return { success: false, reason: error.message };
   }
+}
+
+// ---------- M5-4: attaching files ----------
+//
+// A prompt that talks about a reference the chat can't see is only half
+// the message, so Produce and Insert can hand the files over too. Three
+// ways in, tried in order, because no two of these sites agree:
+//
+//   1. the page's own <input type="file"> — the closest thing to the
+//      user having clicked the paperclip, and what React reads from
+//   2. a paste onto the composer — what most of them support for
+//      screenshots
+//   3. a drop onto the composer — the last resort
+//
+// None of this presses send. The files land in the composer next to the
+// prompt and wait, exactly as the text does.
+//
+// Bytes arrive in chunks: one message per few megabytes, because Chrome's
+// message passing is not built for handing over a whole video at once.
+// A transfer is assembled here and only turned into Files at commit.
+
+const transfers = new Map();
+
+function beginTransfer(transferId, files) {
+  transfers.set(transferId, {
+    startedAt: Date.now(),
+    files: (files || []).map((file) => ({ name: file.name, type: file.type, parts: [] })),
+  });
+  return { success: true };
+}
+
+function addChunk(transferId, index, base64) {
+  const transfer = transfers.get(transferId);
+  if (!transfer) return { success: false, reason: 'That transfer is not open.' };
+  const file = transfer.files[index];
+  if (!file) return { success: false, reason: `No file at index ${index}.` };
+  file.parts.push(base64ToBytes(base64));
+  return { success: true };
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function commitTransfer(transferId) {
+  const transfer = transfers.get(transferId);
+  transfers.delete(transferId);
+  if (!transfer) return { success: false, reason: 'That transfer is not open.' };
+
+  const files = transfer.files.map(
+    (file) => new File([new Blob(file.parts, { type: file.type })], file.name, { type: file.type })
+  );
+  return attachFiles(files);
+}
+
+function buildDataTransfer(files) {
+  const data = new DataTransfer();
+  files.forEach((file) => data.items.add(file));
+  return data;
+}
+
+// Assigning to .files is what a real pick does, and is what React's
+// onChange reads; dispatching input as well covers listeners that watch
+// for either.
+function attachViaFileInput(platform, files) {
+  const selectors = platform.fileInputSelectors || ['input[type="file"]'];
+  for (const selector of selectors) {
+    const inputs = [...document.querySelectorAll(selector)].filter((el) => !el.disabled);
+    for (const input of inputs) {
+      try {
+        input.files = buildDataTransfer(files).files;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return { success: true, method: 'file-input' };
+      } catch {
+        // Some inputs refuse assignment (accept mismatch, detached
+        // node); try the next one rather than giving up on the page.
+      }
+    }
+  }
+  return null;
+}
+
+function attachViaPaste(platform, files) {
+  const target = findInput(platform);
+  if (!target) return null;
+  try {
+    target.el.focus();
+    const event = new ClipboardEvent('paste', {
+      clipboardData: buildDataTransfer(files),
+      bubbles: true,
+      cancelable: true,
+    });
+    target.el.dispatchEvent(event);
+    return { success: true, method: 'paste' };
+  } catch {
+    return null;
+  }
+}
+
+function attachViaDrop(platform, files) {
+  const target = findInput(platform);
+  if (!target) return null;
+  try {
+    const data = buildDataTransfer(files);
+    const fire = (type) =>
+      target.el.dispatchEvent(new DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true }));
+    fire('dragenter');
+    fire('dragover');
+    fire('drop');
+    return { success: true, method: 'drop' };
+  } catch {
+    return null;
+  }
+}
+
+function attachFiles(files) {
+  const platform = currentPlatform();
+  if (!platform) return { success: false, reason: 'Edge Studio does not handle this site.' };
+  if (!files.length) return { success: false, reason: 'No files to attach.' };
+
+  const attempt = attachViaFileInput(platform, files) || attachViaPaste(platform, files) || attachViaDrop(platform, files);
+
+  if (!attempt) {
+    return {
+      success: false,
+      reason: `Could not find anywhere on ${platform.label} to attach a file. Attach it by hand — the prompt is already in the box.`,
+    };
+  }
+
+  // The page was handed the files; whether it accepted them is its own
+  // business and not something we can read back, so say which way it
+  // went in and let Dan see the result on screen.
+  return { ...attempt, platform: platform.id, platformLabel: platform.label, count: files.length };
 }
 
 // ---------- M2-1 / M2-2: response and selection capture ----------
@@ -299,6 +441,18 @@ if (!window.__edgeStudioAdapterListenerRegistered) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'EDGE_STUDIO_INJECT_PROMPT') {
       sendResponse(injectPrompt(message.text));
+    }
+
+    if (message.type === 'EDGE_STUDIO_ATTACH_BEGIN') {
+      sendResponse(beginTransfer(message.transferId, message.files));
+    }
+
+    if (message.type === 'EDGE_STUDIO_ATTACH_CHUNK') {
+      sendResponse(addChunk(message.transferId, message.index, message.base64));
+    }
+
+    if (message.type === 'EDGE_STUDIO_ATTACH_COMMIT') {
+      sendResponse(commitTransfer(message.transferId));
     }
 
     if (message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE') {

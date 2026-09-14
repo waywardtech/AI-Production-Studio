@@ -15,6 +15,7 @@ export const state = {
   selectedTabIds: new Set(),
   captures: [], // staged, unsaved: { id, tabId, label, kind, text, url, capturedAt }
   activeTagFilter: null, // null = all tags
+  attachmentAssetIds: new Set(), // files to send with the next Insert
   usage: { services: [] }, // { id, label, platform, unit, used, limit, thresholdPct, updatedAt, source }
 };
 
