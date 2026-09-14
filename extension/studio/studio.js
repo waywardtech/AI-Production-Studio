@@ -33,7 +33,7 @@ import { initRunOrder, renderRunOrder } from './lib/runorder.js';
 import { initShot, renderShot } from './lib/shot.js';
 import { expandScene, importMaterial, refineScene, scenesFromScript } from './lib/seed.js';
 import { initProduce } from './lib/produce.js';
-import { initBoxes, renderDrawer } from './lib/boxes.js';
+import { fileTexts, initBoxes, renderDrawer } from './lib/boxes.js';
 import { migrate } from '../shared/migrate.js';
 import { subscribe } from '../shared/store.js';
 import { mountProjectBar } from '../shared/project-bar.js';
@@ -104,7 +104,7 @@ async function init() {
   await migrate();
 
   initScenes();
-  initAssets();
+  initAssets({ onTextFiles: fileTexts });
   initRunOrder();
   initShot({ onRefine: refineScene });
   initProduce();

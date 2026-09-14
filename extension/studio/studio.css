@@ -335,6 +335,32 @@ button.compact {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
+.file-badge {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #a9abb4;
+}
+
+.file-badge[data-kind="video"] { color: #cf8bf2; }
+.file-badge[data-kind="audio"] { color: #b8c46f; }
+.file-badge[data-kind="script"],
+.file-badge[data-kind="document"] { color: #7fa8ff; }
+
+/* A file whose bytes aren't held can't be attached to a chat, so the
+   badge is outlined rather than solid — visible before Produce tries. */
+.file-badge.reference-only {
+  color: #6f7178;
+  border: 1px dashed #4d5058;
+  padding: 0 3px;
+}
+
 .still-badge {
   position: absolute;
   bottom: 3px;

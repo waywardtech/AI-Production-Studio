@@ -12,7 +12,8 @@ import { render } from './render.js';
 import { ASSET_CATEGORIES, categoryLabel, newAsset, touch } from './model.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast } from '../../shared/ui.js';
-import { isImage, fileRef, makeThumbnail } from './files.js';
+import { FILE_KINDS, baseName, fileKind, isReadableText, makeThumbnail, readText, storeBytes } from './files.js';
+import { blobs, formatBytes, MAX_STORED_BYTES } from '../../shared/blobs.js';
 
 const gridEl = document.getElementById('asset-grid');
 const searchEl = document.getElementById('asset-search');
@@ -117,6 +118,7 @@ async function editAsset(asset) {
             touch(scene);
             persist(production);
           });
+          if (asset.fileRef?.blobId) await blobs.remove(asset.fileRef.blobId);
           await deleteAsset(asset.id);
           render('assets', 'shot');
           showToast(`Deleted "${asset.name}".`);
@@ -177,6 +179,26 @@ function assetTile(asset) {
     badge.className = 'still-badge';
     badge.textContent = 'STILL';
     frame.appendChild(badge);
+  }
+
+  // What kind of file this is, and whether its bytes are actually here.
+  // An asset that can't be attached should say so on the tile rather
+  // than at the moment Produce tries to send it.
+  const ref = asset.fileRef;
+  if (ref) {
+    const kind = document.createElement('span');
+    kind.className = 'file-badge';
+    kind.dataset.kind = ref.kind || 'other';
+    kind.textContent = FILE_KINDS[ref.kind]?.label || 'File';
+    if (ref.stored) {
+      kind.title = `${ref.name} · ${formatBytes(ref.size)} · attachable`;
+    } else {
+      kind.classList.add('reference-only');
+      kind.title = ref.tooLarge
+        ? `${ref.name} · ${formatBytes(ref.size)} — too big to hold, so it can't be attached`
+        : `${ref.name} · reference only — the file itself isn't held here`;
+    }
+    frame.appendChild(kind);
   }
 
   tile.appendChild(frame);
@@ -289,26 +311,68 @@ export function renderAssets() {
 
 // ---------- intake ----------
 
-export async function ingestImageFiles(files) {
-  const images = [...files].filter(isImage);
-  if (images.length === 0) return [];
+// Local import (M5-1). Anything Dan drops or picks: images, clips,
+// audio, scripts, PDFs. Images and video get a thumbnail, readable text
+// gets read into the record, and everything under the size limit gets
+// its bytes kept so it can be attached to a chat later.
+//
+// Returns { assets, texts } — texts are the readable scripts and notes,
+// which the caller files in the In-box rather than the asset pool.
+export async function ingestFiles(files, { category = null } = {}) {
+  const list = [...files];
+  if (list.length === 0) return { assets: [], texts: [] };
 
   const built = [];
-  for (const file of images) {
+  const texts = [];
+  const skipped = [];
+
+  for (const file of list) {
+    const kind = fileKind(file);
+
+    if (isReadableText(file)) {
+      texts.push({ name: file.name, text: await readTextSafely(file), kind: kind === 'script' ? 'script' : 'note' });
+      continue;
+    }
+
+    const ref = await storeBytes(file);
+    if (ref.tooLarge) skipped.push(file.name);
+
     built.push({
-      name: file.name.replace(/\.[^.]+$/, ''),
-      category: 'other',
+      name: baseName(file.name),
+      category: category || FILE_KINDS[kind]?.category || 'other',
       origin: 'upload',
       thumb: await makeThumbnail(file),
-      fileRef: fileRef(file),
+      fileRef: ref,
       description: '',
     });
   }
-  const created = addAssets(built);
-  showToast(
-    `Added ${created.length} image${created.length === 1 ? '' : 's'}. The originals stay where they are — these are references.`
-  );
-  return created;
+
+  const created = built.length ? addAssets(built) : [];
+
+  if (created.length) {
+    const held = created.filter((a) => a.fileRef?.stored).length;
+    showToast(
+      `Added ${created.length} file${created.length === 1 ? '' : 's'}` +
+        (held ? `, ${held} held here and ready to attach.` : '.')
+    );
+  }
+  if (skipped.length) {
+    showToast(
+      `${skipped.length} file${skipped.length === 1 ? ' is' : 's are'} over ${formatBytes(MAX_STORED_BYTES)} — kept as a reference, not attachable.`,
+      'warning'
+    );
+  }
+
+  return { assets: created, texts };
+}
+
+async function readTextSafely(file) {
+  try {
+    return await readText(file);
+  } catch (error) {
+    console.error('[Edge Studio] Could not read text file:', error);
+    return '';
+  }
 }
 
 async function addFromUrl() {
@@ -393,7 +457,12 @@ async function addFromDescription() {
   showToast('Described asset added to the pool.');
 }
 
-export function initAssets() {
+// boxes.js owns the In-box; assets.js shouldn't have to know about it,
+// so the entry point joins the two.
+let onTextFiles = null;
+
+export function initAssets({ onTextFiles: handler = null } = {}) {
+  onTextFiles = handler;
   searchEl.addEventListener('input', () => {
     state.assetQuery = searchEl.value;
     renderAssets();
@@ -401,8 +470,11 @@ export function initAssets() {
 
   document.getElementById('asset-upload-btn').addEventListener('click', () => fileInputEl.click());
   fileInputEl.addEventListener('change', async () => {
-    await ingestImageFiles(fileInputEl.files);
+    const { texts } = await ingestFiles(fileInputEl.files);
     fileInputEl.value = '';
+    // A script picked through Upload is still a script: hand it to
+    // whoever wired the In-box up rather than dropping it.
+    if (texts.length && onTextFiles) await onTextFiles(texts);
   });
 
   document.getElementById('asset-url-btn').addEventListener('click', addFromUrl);

@@ -26,8 +26,8 @@ import { getSyncMeta } from '../../shared/store.js';
 import { deletionNote } from '../../shared/sync-status.js';
 import { openModal } from '../../shared/modal.js';
 import { showToast, copyToClipboard } from '../../shared/ui.js';
-import { downloadText, isImage, isText, readText } from './files.js';
-import { ingestImageFiles } from './assets.js';
+import { downloadText } from './files.js';
+import { ingestFiles } from './assets.js';
 import { fileDailiesReport, produceScenes } from './produce.js';
 import { importMaterial, scenesFromScript } from './seed.js';
 
@@ -383,24 +383,33 @@ export function renderDrawer() {
 
 // ---------- drop handling ----------
 
+// Everything droppable goes through one path: assets.js decides what is
+// a media file and what is readable text, and the text comes back here
+// for the In-box. Nothing is "skipped" any more — a format we can't
+// thumbnail is still a file worth keeping a reference to.
 async function ingest(files) {
-  const list = [...files];
-  const images = list.filter(isImage);
-  const texts = list.filter((f) => !isImage(f) && isText(f));
-  const ignored = list.length - images.length - texts.length;
+  const { assets, texts } = await ingestFiles(files);
 
-  if (images.length) await ingestImageFiles(images);
-
-  for (const file of texts) {
-    await addToInbox({ kind: 'script', title: file.name, text: await readText(file) });
+  for (const item of texts) {
+    await addToInbox({ kind: item.kind, title: item.name, text: item.text });
   }
 
   if (texts.length) {
-    showToast(`${texts.length} file${texts.length === 1 ? '' : 's'} in the in-box.`);
+    showToast(`${texts.length} script${texts.length === 1 ? '' : 's'} in the In-box.`);
     openDrawer('inbox');
+  } else if (assets.length) {
+    render('assets');
   }
-  if (ignored) {
-    showToast(`${ignored} file${ignored === 1 ? '' : 's'} skipped — only images and text files can be read here.`, 'warning');
+}
+
+// Scripts picked through the asset Upload button land here too.
+export async function fileTexts(texts) {
+  for (const item of texts) {
+    await addToInbox({ kind: item.kind, title: item.name, text: item.text });
+  }
+  if (texts.length) {
+    showToast(`${texts.length} script${texts.length === 1 ? '' : 's'} in the In-box.`);
+    openDrawer('inbox');
   }
 }
 
