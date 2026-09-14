@@ -796,3 +796,105 @@ body.studio .toast {
   display: inline-flex;
   gap: 12px;
 }
+
+/* ---------- the Drive browser (M5-3) ---------- */
+
+.drive-search input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3a3c45;
+  background: #14151a;
+  color: #e7e7ea;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.drive-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.drive-crumb:disabled {
+  color: #a9abb4;
+  cursor: default;
+  text-decoration: none;
+}
+
+.drive-crumb-sep {
+  color: #4d5058;
+}
+
+.drive-crumb-search {
+  color: #a9abb4;
+}
+
+.drive-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #2b2d34;
+  border-radius: 6px;
+  padding: 4px;
+  background: #14151a;
+}
+
+.drive-list[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.drive-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.drive-row:hover {
+  background: #1c1d22;
+}
+
+.drive-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.drive-open {
+  flex: 1;
+  text-align: left;
+  color: #e7e7ea;
+}
+
+.drive-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-meta {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #6f7178;
+}
+
+.drive-row[data-kind="gdoc"] .drive-meta {
+  color: #7fa8ff;
+}
+
+.drive-more {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.drive-count {
+  margin: 8px 0 0;
+}

@@ -38,6 +38,21 @@
         </div>
         <p class="hint">Disconnecting stops syncing from this browser. Your Docs and
           folders stay in your Drive, untouched.</p>
+
+        <h3 class="sub-head">Importing from your Drive</h3>
+        <p class="hint">Edge Studio normally sees only the files it created itself.
+          Browsing the rest of your Drive — to import media, scripts or documents you
+          already have — needs its own permission, which Google asks for separately.
+          It is used for reading files you pick, nothing else.</p>
+        <p id="browse-state" class="facts-line">Off</p>
+        <div class="row">
+          <button id="enable-browse-btn" class="secondary">Allow Drive browsing</button>
+          <button id="disable-browse-btn" class="secondary hidden">Turn browsing off</button>
+        </div>
+        <p id="browse-error" class="error-line hidden"></p>
+        <p class="hint">Google classes this as a restricted permission. That is fine
+          while your OAuth app stays in <strong>Testing</strong> with you as the test
+          user; publishing it would need Google's review.</p>
       </div>
 
       <!-- Ready to connect -->
@@ -114,6 +129,7 @@
   <em>Project</em>/
     Prompts/        a Doc per saved prompt — edit the text under each [Heading]
     Replies/        a Doc per saved reply
+    Assets/         the image, clip or document behind each asset
     Productions/
       <em>Production</em>/   its generated shot list
         In-box/     a Doc per script or note
@@ -125,7 +141,21 @@
     </section>
 
     <!-- ---------------- BACKUP ---------------- -->
-    <section class="card">
+        <section class="card">
+      <h2>Files held in this browser</h2>
+      <p class="lead">An imported image, clip or document is kept here so it can be
+        attached to a chat or a generator. Each one is also mirrored to its project's
+        <strong>Assets</strong> folder in Drive when you're connected; anything over
+        50&nbsp;MB stays a reference with a link rather than being held.</p>
+      <p id="blob-usage" class="facts-line">—</p>
+      <div class="row">
+        <button id="prune-blobs-btn" class="secondary">Remove files with no asset</button>
+      </div>
+      <p class="hint">Files are removed with their asset. This clears anything left
+        behind by a delete that didn't finish.</p>
+    </section>
+
+<section class="card">
       <h2>Backup</h2>
       <p>A single file with every project, prompt, reply, production, asset and document
         in this browser — useful before big changes, or to move to another browser without

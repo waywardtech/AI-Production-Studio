@@ -2,7 +2,8 @@
 
 import { migrate } from '../shared/migrate.js';
 import { COLLECTIONS, getSetting, list, subscribe, updateSetting } from '../shared/store.js';
-import { connect, disconnect, looksLikeClientId, redirectUri } from '../shared/google-auth.js';
+import { connect, disableBrowsing, disconnect, enableBrowsing, looksLikeClientId, redirectUri } from '../shared/google-auth.js';
+import { blobs, formatBytes } from '../shared/blobs.js';
 import { openModal } from '../shared/modal.js';
 import { copyToClipboard, showToast } from '../shared/ui.js';
 import { describeSyncState, relativeTime } from '../shared/sync-status.js';
@@ -58,6 +59,13 @@ async function renderGoogle() {
     error.classList.toggle('hidden', !google.lastError);
     $('reconnect-btn').classList.toggle('hidden', google.status !== 'reconnect');
     $('sync-now-btn').disabled = google.status === 'syncing';
+
+    const browsing = !!google.browseEnabled;
+    $('browse-state').textContent = browsing
+      ? 'On — “From Drive” in the studio can read files you pick.'
+      : 'Off — only the files Edge Studio created are visible to it.';
+    $('enable-browse-btn').classList.toggle('hidden', browsing);
+    $('disable-browse-btn').classList.toggle('hidden', !browsing);
   }
 
   if (document.activeElement !== $('client-id-input')) {
@@ -129,6 +137,17 @@ async function runDisconnect() {
 // ---------- backup ----------
 
 const BACKUP_FORMAT = 'edge-studio-backup';
+
+async function renderBlobUsage() {
+  try {
+    const { count, bytes } = await blobs.usage();
+    $('blob-usage').textContent = count
+      ? `${count} file${count === 1 ? '' : 's'} · ${formatBytes(bytes)}`
+      : 'No files held here yet.';
+  } catch (error) {
+    $('blob-usage').textContent = `Could not read the file store: ${error.message}`;
+  }
+}
 
 async function renderCounts() {
   const counts = $('counts');
@@ -250,15 +269,48 @@ async function init() {
     if (file) await importBackup(file);
   });
 
+  $('enable-browse-btn').addEventListener('click', async () => {
+    const error = $('browse-error');
+    error.classList.add('hidden');
+    try {
+      await enableBrowsing();
+      await renderGoogle();
+    } catch (err) {
+      error.textContent = err.message;
+      error.classList.remove('hidden');
+      await renderGoogle();
+    }
+  });
+
+  $('disable-browse-btn').addEventListener('click', async () => {
+    await disableBrowsing();
+    await renderGoogle();
+  });
+
+  // Bytes left behind by a delete that didn't finish. Anything still
+  // pointed at by an asset is kept.
+  $('prune-blobs-btn').addEventListener('click', async () => {
+    const keep = (await list('assets', { includeDeleted: true }))
+      .map((asset) => asset.fileRef?.blobId)
+      .filter(Boolean);
+    const dropped = await blobs.pruneExcept(keep);
+    await renderBlobUsage();
+    $('blob-usage').textContent += dropped ? ` · removed ${dropped} orphaned` : ' · nothing to remove';
+  });
+
   subscribe((events) => {
     if (events.some((e) => e.kind === 'setting' && e.name === 'google')) renderGoogle();
-    if (events.some((e) => e.kind === 'record')) renderCounts();
+    if (events.some((e) => e.kind === 'record')) {
+      renderCounts();
+      renderBlobUsage();
+    }
   });
   // Keeps "3 min ago" honest while the page is open.
   setInterval(renderGoogle, 30 * 1000);
 
   await renderGoogle();
   await renderCounts();
+  await renderBlobUsage();
 }
 
 init();

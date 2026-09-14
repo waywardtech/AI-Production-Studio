@@ -29,6 +29,7 @@ import { hasUnsavedChanges, loadProject } from './lib/repository.js';
 import { registerRenderer, render, renderAll } from './lib/render.js';
 import { initScenes, renderScenes } from './lib/scenes.js';
 import { initAssets, refreshHeldBytes, renderAssets } from './lib/assets.js';
+import { initDriveImport } from './lib/drive-import.js';
 import { initRunOrder, renderRunOrder } from './lib/runorder.js';
 import { initShot, renderShot } from './lib/shot.js';
 import { expandScene, importMaterial, refineScene, scenesFromScript } from './lib/seed.js';
@@ -105,6 +106,7 @@ async function init() {
 
   initScenes();
   initAssets({ onTextFiles: fileTexts });
+  initDriveImport({ onTextFiles: fileTexts });
   initRunOrder();
   initShot({ onRefine: refineScene });
   initProduce();

@@ -149,6 +149,40 @@ export function createDrive({ fetchImpl, auth }) {
       return listAll({ q: clauses.join(' and '), spaces: 'drive' });
     },
 
+    // ---------- browsing the Drive that was already there ----------
+    //
+    // These are the only calls that reach beyond files Edge Studio made,
+    // and they only work once Drive browsing has been granted in
+    // Settings. One page at a time: a folder of a thousand plates should
+    // not be one request, and the browser only shows a screenful anyway.
+
+    async listFolderPage({ parentId = 'root', pageToken, pageSize = 100, foldersFirst = true } = {}) {
+      const page = await request('GET', `${API}/files`, {
+        query: {
+          q: `${quote(parentId)} in parents and trashed = false`,
+          pageToken,
+          pageSize,
+          orderBy: foldersFirst ? 'folder,name' : 'name',
+          fields: `nextPageToken,files(${FILE_FIELDS},size,iconLink,thumbnailLink)`,
+        },
+      });
+      return { files: page.files || [], nextPageToken: page.nextPageToken || null };
+    },
+
+    async searchFiles(text, { pageSize = 100 } = {}) {
+      const term = String(text || '').trim();
+      if (!term) return { files: [], nextPageToken: null };
+      const page = await request('GET', `${API}/files`, {
+        query: {
+          q: `name contains ${quote(term)} and trashed = false`,
+          pageSize,
+          orderBy: 'folder,name',
+          fields: `nextPageToken,files(${FILE_FIELDS},size,iconLink,thumbnailLink)`,
+        },
+      });
+      return { files: page.files || [], nextPageToken: page.nextPageToken || null };
+    },
+
     async listChildren(folderId) {
       return listAll({ q: `${quote(folderId)} in parents and trashed = false`, spaces: 'drive' });
     },

@@ -87,6 +87,22 @@ body.settings {
   overflow-wrap: anywhere;
 }
 
+/* A sub-section inside a card: the Drive-browsing grant and the file
+   store both sit under the connected-account block. */
+.sub-head {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a9abb4;
+  margin: 22px 0 6px;
+}
+
+.facts-line {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #c9cad0;
+}
+
 .error-line {
   color: #e8837a;
   margin: 6px 0 10px;
@@ -95,7 +111,9 @@ body.settings {
 .error-line.hidden,
 #google-connected.hidden,
 #google-ready.hidden,
-#reconnect-btn.hidden {
+#reconnect-btn.hidden,
+#enable-browse-btn.hidden,
+#disable-browse-btn.hidden {
   display: none;
 }
 

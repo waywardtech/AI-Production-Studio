@@ -26,6 +26,18 @@ export const SCOPES = [
   'https://www.googleapis.com/auth/drive.appdata',
 ];
 
+// Browsing the Drive you already have is a separate, bigger ask, so it
+// is a separate grant. drive.file can only ever see files Edge Studio
+// made, which is exactly wrong for "import that folder of plates I
+// shot last year" — reading those needs drive.readonly.
+//
+// Google calls that a restricted scope. For an OAuth app in Testing
+// status, with you as the test user, that is fine and needs no review;
+// publishing it would need Google's verification. It is asked for only
+// when you turn on Drive browsing in Settings, never at connect time,
+// so the everyday consent screen stays narrow.
+export const BROWSE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
 const TOKEN_KEY = 'googleToken';
 const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
@@ -58,12 +70,16 @@ async function writeToken(token) {
   else await chrome.storage.session.remove(TOKEN_KEY);
 }
 
-function buildAuthUrl({ clientId, interactive, loginHint }) {
+export function scopesFor({ browse = false } = {}) {
+  return browse ? [...SCOPES, BROWSE_SCOPE] : [...SCOPES];
+}
+
+function buildAuthUrl({ clientId, interactive, loginHint, browse = false }) {
   const url = new URL(AUTH_ENDPOINT);
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('response_type', 'token');
   url.searchParams.set('redirect_uri', redirectUri());
-  url.searchParams.set('scope', SCOPES.join(' '));
+  url.searchParams.set('scope', scopesFor({ browse }).join(' '));
   url.searchParams.set('include_granted_scopes', 'true');
   if (!interactive) url.searchParams.set('prompt', 'none');
   if (loginHint) url.searchParams.set('login_hint', loginHint);
@@ -87,16 +103,26 @@ export function parseAuthResponse(responseUrl) {
   };
 }
 
-async function runFlow({ interactive }) {
+async function runFlow({ interactive, browse = null }) {
   const google = (await getSetting('google', {})) || {};
   if (!looksLikeClientId(google.clientId)) {
     throw new Error('Add your Google OAuth client ID in Settings first.');
   }
 
+  // Once browsing has been granted, every later token asks for it again
+  // — otherwise a silent renewal would quietly drop the permission and
+  // the Drive browser would start failing halfway through a session.
+  const wantBrowse = browse === null ? !!google.browseEnabled : browse;
+
   let responseUrl;
   try {
     responseUrl = await chrome.identity.launchWebAuthFlow({
-      url: buildAuthUrl({ clientId: google.clientId.trim(), interactive, loginHint: google.account?.email }),
+      url: buildAuthUrl({
+        clientId: google.clientId.trim(),
+        interactive,
+        loginHint: google.account?.email,
+        browse: wantBrowse,
+      }),
       interactive,
     });
   } catch (error) {
@@ -130,6 +156,7 @@ async function runFlow({ interactive }) {
   const token = {
     accessToken: result.accessToken,
     expiresAt: Date.now() + result.expiresIn * 1000,
+    scopes: result.granted,
   };
   await writeToken(token);
   return token.accessToken;
@@ -163,6 +190,33 @@ export async function connect({ fetchAccount }) {
   return account;
 }
 
+// Turning on Drive browsing. Asks for the extra permission on top of
+// what's already granted; if Google hands back a token without it (the
+// box was unticked), nothing changes and the caller is told why.
+export async function enableBrowsing() {
+  await runFlow({ interactive: true, browse: true });
+  const token = await readToken();
+  const granted = (token?.scopes || []).includes(BROWSE_SCOPE);
+  await updateSetting('google', { browseEnabled: granted });
+  if (!granted) {
+    throw new Error('Google didn\'t grant Drive browsing — connect again and leave the Drive permission ticked.');
+  }
+  return true;
+}
+
+// Turning it off stops Edge Studio asking for the permission and hides
+// the browser. Google keeps the grant until the connection is revoked,
+// which Disconnect does.
+export async function disableBrowsing() {
+  await updateSetting('google', { browseEnabled: false });
+  await invalidateToken();
+}
+
+export async function canBrowse() {
+  const google = (await getSetting('google', {})) || {};
+  return !!(google.connected && google.browseEnabled);
+}
+
 // Disconnecting stops syncing and revokes this browser's access. It does
 // not touch anything in Drive: the Docs and folders stay yours.
 export async function disconnect() {
@@ -178,5 +232,5 @@ export async function disconnect() {
       // Offline or already revoked — the local token is gone either way.
     }
   }
-  await updateSetting('google', { connected: false, status: 'off', lastError: null });
+  await updateSetting('google', { connected: false, status: 'off', lastError: null, browseEnabled: false });
 }

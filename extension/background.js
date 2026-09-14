@@ -6,9 +6,9 @@
 import { migrate } from './shared/migrate.js';
 import { get, getSetting, getSyncMeta, list, subscribe } from './shared/store.js';
 import { createDrive } from './shared/drive.js';
-import { getAccessToken, invalidateToken } from './shared/google-auth.js';
+import { canBrowse, getAccessToken, invalidateToken } from './shared/google-auth.js';
 import { createSyncEngine } from './shared/sync.js';
-import { blobs } from './shared/blobs.js';
+import { blobs, isTooLarge, newBlobId } from './shared/blobs.js';
 import { assembleSegments, profileById, segmentText, targetById } from './studio/lib/prompt.js';
 
 const SYNC_ALARM = 'edge-studio-sync';
@@ -222,7 +222,114 @@ async function fetchAssetBytes(assetId) {
   }
 }
 
+// ---------- browsing and importing from Drive (M5-3) ----------
+//
+// The worker does this rather than the page because it already holds
+// the Drive client and the token, and because pages share its
+// IndexedDB: bytes it downloads are immediately visible to the studio.
+
+const GOOGLE_DOC_MIMES = {
+  'application/vnd.google-apps.document': 'text/plain',
+  'application/vnd.google-apps.presentation': 'text/plain',
+  'application/vnd.google-apps.spreadsheet': 'text/csv',
+};
+
+async function browseGuard() {
+  if (await canBrowse()) return null;
+  return {
+    success: false,
+    needsPermission: true,
+    reason: 'Turn on Drive browsing in Settings first — reading files Edge Studio did not create needs its own permission.',
+  };
+}
+
+async function driveList({ parentId, pageToken }) {
+  const denied = await browseGuard();
+  if (denied) return denied;
+  try {
+    const page = await drive.listFolderPage({ parentId, pageToken });
+    return { success: true, ...page };
+  } catch (error) {
+    return { success: false, reason: error.message };
+  }
+}
+
+async function driveSearch({ text }) {
+  const denied = await browseGuard();
+  if (denied) return denied;
+  try {
+    const page = await drive.searchFiles(text);
+    return { success: true, ...page };
+  } catch (error) {
+    return { success: false, reason: error.message };
+  }
+}
+
+// A Google Doc has no bytes worth downloading — it becomes text, which
+// the studio files in the In-box. Everything else comes down as itself.
+async function driveImport({ fileId }) {
+  const denied = await browseGuard();
+  if (denied) return denied;
+
+  try {
+    const file = await drive.getFile(fileId);
+    if (!file) return { success: false, reason: 'That file is no longer in Drive.' };
+
+    const exportMime = GOOGLE_DOC_MIMES[file.mimeType];
+    if (exportMime) {
+      const text = await drive.exportText(file.id);
+      return { success: true, kind: 'text', name: file.name, text, url: file.webViewLink || null };
+    }
+
+    const size = Number(file.size) || 0;
+    if (isTooLarge(size)) {
+      return {
+        success: true,
+        kind: 'reference',
+        name: file.name,
+        mimeType: file.mimeType,
+        size,
+        url: file.webViewLink || null,
+        driveFileId: file.id,
+      };
+    }
+
+    const blob = await drive.downloadFile(file.id);
+    if (!blob) return { success: false, reason: 'That file could not be downloaded.' };
+
+    const blobId = newBlobId();
+    await blobs.put(blobId, blob, { name: file.name, type: file.mimeType });
+    return {
+      success: true,
+      kind: 'file',
+      name: file.name,
+      mimeType: file.mimeType || blob.type,
+      size: blob.size,
+      blobId,
+      url: file.webViewLink || null,
+      driveFileId: file.id,
+    };
+  } catch (error) {
+    return { success: false, reason: error.message };
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'EDGE_STUDIO_DRIVE_LIST') {
+    driveList(message).then(sendResponse);
+    return true;
+  }
+
+  if (message.type === 'EDGE_STUDIO_DRIVE_SEARCH') {
+    driveSearch(message).then(sendResponse);
+    return true;
+  }
+
+  if (message.type === 'EDGE_STUDIO_DRIVE_IMPORT') {
+    driveImport(message).then(sendResponse);
+    return true;
+  }
+
   if (message.type === 'EDGE_STUDIO_FETCH_ASSET_BYTES') {
     fetchAssetBytes(message.assetId).then(sendResponse);
     return true;
