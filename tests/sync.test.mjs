@@ -23,7 +23,16 @@ const engine = () =>
       targetLabel: 'Sora',
       profileLabel: 'General shot',
     }),
+    blobSource: bytes,
   });
+
+// Stands in for the IndexedDB byte store the extension uses.
+const bytes = {
+  held: new Map(),
+  async getBlob(id) {
+    return this.held.get(id) || null;
+  },
+};
 const docText = (id) => driveFake.files.get(id).content;
 
 // ---------- seed one project's worth of work ----------
@@ -56,7 +65,7 @@ console.log('--- first sync builds the folder tree and the Docs ---');
   const [root] = driveFake.byName('Edge Studio');
   const [apex] = driveFake.byName('Apex');
   eq([!!root, apex.parents[0] === root.id], [true, true], 'Edge Studio/Apex');
-  eq(driveFake.childrenOf(apex.id).map((f) => f.name).sort(), ['Productions', 'Prompts', 'Replies'], 'project holds Prompts, Replies, Productions');
+  eq(driveFake.childrenOf(apex.id).map((f) => f.name).sort(), ['Assets', 'Productions', 'Prompts', 'Replies'], 'project holds Prompts, Replies, Productions, Assets');
 
   const [promptsFolder] = driveFake.childrenOf(apex.id).filter((f) => f.name === 'Prompts');
   const [promptDoc] = driveFake.childrenOf(promptsFolder.id);
@@ -215,6 +224,80 @@ console.log('\n--- a second machine catches up without duplicating anything ---'
   const back = await engine().run();
   eq([(await store.get('prompts', prompt.id)).tags, back.pulled >= 1], [['launch', 'from-b'], true], "machine A pulls machine B's edit");
   Object.keys(machineB); // keep reference for readability
+}
+
+console.log('\n--- asset files ---');
+{
+  // An asset imported on this machine: the record keeps a reference, the
+  // bytes sit in the byte store under a blob id.
+  const clip = await store.put('assets', studioModel.newAsset({
+    projectId: project.id,
+    name: 'Hangar plate',
+    category: 'location',
+    fileRef: { name: 'hangar.jpg', size: 9, type: 'image/jpeg', kind: 'image', blobId: 'blob-1', stored: true },
+  }));
+  bytes.held.set('blob-1', new Blob(['JPEGBYTES']));
+
+  await engine().run();
+
+  // By this point earlier sections have renamed the project, so find its
+  // folder through the sync bookkeeping rather than by name.
+  const projectMeta = await store.getSyncMeta('projects', project.id);
+  const [assetsFolder] = driveFake.childrenOf(projectMeta.folderId).filter((f) => f.name === 'Assets');
+  const uploaded = driveFake.childrenOf(assetsFolder.id);
+  eq(uploaded.map((f) => [f.name, f.mimeType]), [['hangar.jpg', 'image/jpeg']], 'the file goes up under its own name and type');
+  eq(uploaded[0].content, 'JPEGBYTES', 'the bytes arrive intact');
+  eq(uploaded[0].appProperties.edgeStudioBlobId, 'blob-1', 'the file is tagged with the blob it came from');
+
+  const meta = await store.getSyncMeta('assets', clip.id);
+  eq([meta.fileId === uploaded[0].id, meta.fileBlobId, meta.fileName], [true, 'blob-1', 'hangar.jpg'], 'sync meta remembers the upload, not the record');
+  eq('fileId' in clip, false, 'nothing about Drive is written onto the record');
+
+  // Editing the description must not re-send the bytes.
+  const before = driveFake.requests.length;
+  clip.description = 'Wide, low sun';
+  await store.put('assets', clip);
+  await engine().run();
+  const mutations = driveFake.mutations(before);
+  // A new upload is a POST to the upload endpoint; rewriting the index
+  // is a PATCH to the existing one. Only the second should happen.
+  eq(mutations.filter((r) => r.method === 'POST' && r.path === '/upload/drive/v3/files').length, 0,
+    'the bytes are not uploaded again');
+  eq(mutations.some((r) => r.method === 'PATCH' && r.path.startsWith('/upload/drive/v3/files/')), true,
+    'but the index is rewritten with the new description');
+  eq(driveFake.childrenOf(assetsFolder.id).length, 1, 'and no second copy appears in Assets');
+
+  // Renaming the underlying file renames it in Drive in place.
+  clip.fileRef = { ...clip.fileRef, name: 'hangar-plate.jpg' };
+  await store.put('assets', clip);
+  await engine().run();
+  eq(driveFake.childrenOf(assetsFolder.id).map((f) => f.name), ['hangar-plate.jpg'], 'a rename moves the existing file, not a new one');
+
+  // Replacing the bytes uploads the new file and trashes the old.
+  clip.fileRef = { ...clip.fileRef, blobId: 'blob-2', name: 'hangar-v2.jpg' };
+  bytes.held.set('blob-2', new Blob(['NEWBYTES']));
+  await store.put('assets', clip);
+  await engine().run();
+  const live = driveFake.childrenOf(assetsFolder.id).filter((f) => !f.trashed);
+  eq(live.map((f) => f.content), ['NEWBYTES'], 'the replacement is what is left in Assets');
+  eq(driveFake.childrenOf(assetsFolder.id).filter((f) => f.trashed).length, 1, 'the old version is trashed, not deleted');
+
+  // A reference-only asset — too big to hold, or imported on another
+  // machine — has nothing to upload and must not fail the run.
+  const huge = await store.put('assets', studioModel.newAsset({
+    projectId: project.id,
+    name: 'Master cut',
+    fileRef: { name: 'master.mov', size: 900e6, type: 'video/quicktime', kind: 'video', blobId: 'blob-missing', stored: false },
+  }));
+  const summary = await engine().run();
+  eq(summary.errors.length, 0, 'an asset whose bytes are not here syncs without error');
+  eq((await store.getSyncMeta('assets', huge.id)).fileId, null, 'and no file is invented for it');
+  eq(driveFake.childrenOf(assetsFolder.id).filter((f) => !f.trashed).length, 1, 'Assets holds only what was actually uploaded');
+
+  // Deleting takes the Drive file with it.
+  await store.remove('assets', clip.id);
+  await engine().run();
+  eq(driveFake.files.get(live[0].id).trashed, true, 'deleting the asset trashes its file');
 }
 
 console.log('\n--- auth failures ---');

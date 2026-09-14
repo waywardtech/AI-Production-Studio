@@ -4,10 +4,11 @@
 // CORE-4 (keeping the record store in step with Google Docs).
 
 import { migrate } from './shared/migrate.js';
-import { getSetting, list, subscribe } from './shared/store.js';
+import { get, getSetting, getSyncMeta, list, subscribe } from './shared/store.js';
 import { createDrive } from './shared/drive.js';
 import { getAccessToken, invalidateToken } from './shared/google-auth.js';
 import { createSyncEngine } from './shared/sync.js';
+import { blobs } from './shared/blobs.js';
 import { assembleSegments, profileById, segmentText, targetById } from './studio/lib/prompt.js';
 
 const SYNC_ALARM = 'edge-studio-sync';
@@ -57,7 +58,9 @@ async function productionContext(production) {
   };
 }
 
-const engine = createSyncEngine({ drive, productionContext });
+// The worker has IndexedDB, so it can hand the engine an asset's bytes
+// to upload. A machine that doesn't hold them just has nothing to send.
+const engine = createSyncEngine({ drive, productionContext, blobSource: blobs });
 
 let running = null;
 let again = false;
@@ -190,7 +193,41 @@ async function relayToTab(tabId, message) {
   }
 }
 
+// An asset imported on another machine arrives as a record with no
+// bytes behind it. The file is in Drive, so fetch it on demand rather
+// than pulling every project's media down on every sync. The worker
+// does it because it already holds the Drive client — and because
+// pages and the worker share one IndexedDB, the bytes land where the
+// page will find them.
+async function fetchAssetBytes(assetId) {
+  const asset = await get('assets', assetId);
+  if (!asset) return { success: false, reason: 'That asset is gone.' };
+
+  const blobId = asset.fileRef?.blobId;
+  if (!blobId) return { success: false, reason: 'That asset has no file behind it.' };
+  if (await blobs.has(blobId)) return { success: true, already: true };
+
+  const meta = await getSyncMeta('assets', assetId);
+  if (!meta?.fileId) {
+    return { success: false, reason: "This file hasn't reached Drive — it was imported on another machine and hasn't synced." };
+  }
+
+  try {
+    const blob = await drive.downloadFile(meta.fileId);
+    if (!blob) return { success: false, reason: 'The file is no longer in Drive.' };
+    await blobs.put(blobId, blob, { name: asset.fileRef.name, type: asset.fileRef.type });
+    return { success: true, size: blob.size };
+  } catch (error) {
+    return { success: false, reason: error.message };
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'EDGE_STUDIO_FETCH_ASSET_BYTES') {
+    fetchAssetBytes(message.assetId).then(sendResponse);
+    return true;
+  }
+
   if (message.type === 'EDGE_STUDIO_SYNC_NOW') {
     runSync().then((summary) => sendResponse(summary || null));
     return true;

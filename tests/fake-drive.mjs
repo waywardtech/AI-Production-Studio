@@ -70,11 +70,17 @@ export function createFakeDrive() {
     async text() {
       return typeof payload === 'string' ? payload : JSON.stringify(payload);
     },
+    async blob() {
+      return new Blob([typeof payload === 'string' ? payload : JSON.stringify(payload)]);
+    },
     _isText: text,
   });
 
   async function fetchImpl(href, { method = 'GET', headers = {}, body } = {}) {
     const url = new URL(href);
+    // An upload of file bytes arrives as a Blob rather than a string;
+    // read it back out before the multipart parser sees it.
+    if (body && typeof body.text === 'function') body = await body.text();
     requests.push({ method, path: url.pathname, query: Object.fromEntries(url.searchParams) });
 
     if (failNext401 || headers.Authorization !== `Bearer ${validToken}`) {
@@ -105,7 +111,7 @@ export function createFakeDrive() {
         return respond(200, exported, { text: true });
       }
       if (method === 'GET' && url.searchParams.get('alt') === 'media') {
-        return respond(200, JSON.parse(file.content));
+        return respond(200, file.content);
       }
       if (method === 'GET') return respond(200, publicFile(file));
 

@@ -45,6 +45,25 @@ function multipartBody(metadata, content, contentType) {
   return { body, contentType: `multipart/related; boundary=${boundary}` };
 }
 
+// The same envelope, but with the content as a Blob so the bytes go up
+// untouched. Building the body as a Blob rather than a string is what
+// keeps a JPEG a JPEG: a binary payload spliced into a JS string would
+// be mangled by UTF-8 encoding on the way out.
+function multipartBlobBody(metadata, blob, contentType) {
+  const boundary = `edge-studio-${Math.random().toString(36).slice(2)}`;
+  const head =
+    `--${boundary}\r\n` +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    `${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: ${contentType}\r\n\r\n`;
+  const tail = `\r\n--${boundary}--`;
+  return {
+    body: new Blob([head, blob, tail]),
+    contentType: `multipart/related; boundary=${boundary}`,
+  };
+}
+
 // Google's text export starts with a byte-order mark and uses CRLF line
 // endings; nothing downstream should have to know that.
 export function normalizeExportedText(text) {
@@ -89,6 +108,7 @@ export function createDrive({ fetchImpl, auth }) {
 
     if (response.status === 204 || parse === 'none') return null;
     if (parse === 'text') return response.text();
+    if (parse === 'blob') return response.blob();
     return response.json();
   }
 
@@ -164,6 +184,42 @@ export function createDrive({ fetchImpl, auth }) {
         body,
         contentType,
       });
+    },
+
+    // ---------- files kept as themselves ----------
+    //
+    // An asset's bytes go up as an ordinary Drive file rather than a
+    // Doc: converting a JPEG or an MP4 to a Google Doc would be
+    // nonsense, and the point is to get the same file back out.
+
+    async uploadFile({ name, parentId, blob, mimeType, appProperties = {} }) {
+      const { body, contentType } = multipartBlobBody(
+        {
+          name,
+          parents: [parentId],
+          mimeType: mimeType || blob.type || 'application/octet-stream',
+          appProperties,
+        },
+        blob,
+        mimeType || blob.type || 'application/octet-stream'
+      );
+      return request('POST', `${UPLOAD}/files`, {
+        query: { uploadType: 'multipart', fields: FILE_FIELDS },
+        body,
+        contentType,
+      });
+    },
+
+    async downloadFile(id) {
+      try {
+        return await request('GET', `${API}/files/${encodeURIComponent(id)}`, {
+          query: { alt: 'media' },
+          parse: 'blob',
+        });
+      } catch (error) {
+        if (error instanceof DriveError && error.status === 404) return null;
+        throw error;
+      }
     },
 
     async exportText(id) {

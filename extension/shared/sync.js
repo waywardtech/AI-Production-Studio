@@ -65,6 +65,10 @@ export function createSyncEngine({
   // supplied by the background worker, which can load the studio's pure
   // prompt assembly. Kept out of here so this module has no studio code.
   productionContext = () => ({ assembleShot: () => '', targetLabel: '', profileLabel: '' }),
+  // An asset's bytes live in IndexedDB (shared/blobs.js), which this
+  // module shouldn't have to know about — and which doesn't exist in the
+  // tests. Injected for both reasons.
+  blobSource = { getBlob: async () => null },
   now = () => new Date().toISOString(),
 } = {}) {
   let summary;
@@ -123,6 +127,7 @@ export function createSyncEngine({
       prompts: await sub(meta.prompts, 'Prompts', 'prompts'),
       replies: await sub(meta.replies, 'Replies', 'replies'),
       productions: await sub(meta.productions, 'Productions', 'productions'),
+      assets: await sub(meta.assets, 'Assets', 'assets'),
     };
   }
 
@@ -171,6 +176,65 @@ export function createSyncEngine({
     return drive.createDoc({ name, parentId, text, description, appProperties });
   }
 
+  // An asset's bytes, mirrored into the project's Assets folder.
+  //
+  // Bytes are uploaded once and identified by their blob id: editing an
+  // asset's name or description changes the record, not the file, and
+  // must not re-upload a 40 MB clip. A machine that doesn't hold the
+  // bytes (they were imported somewhere else, or the file was too big to
+  // keep) has nothing to upload and says so by leaving the file alone.
+  async function assetFile(record, meta, projectMeta) {
+    const ref = record.fileRef;
+    if (!ref || !ref.blobId) return {};
+
+    const keep = {
+      fileId: meta.fileId || null,
+      fileUrl: meta.fileUrl || null,
+      fileBlobId: meta.fileBlobId || null,
+      fileName: meta.fileName || null,
+      fileSize: meta.fileSize || null,
+    };
+
+    // Already up there, and it's the same bytes: at most a rename.
+    if (keep.fileId && keep.fileBlobId === ref.blobId) {
+      if (ref.name && keep.fileName !== ref.name) {
+        try {
+          await drive.update(keep.fileId, { name: ref.name });
+          keep.fileName = ref.name;
+        } catch (error) {
+          if (!isNotFound(error)) throw error;
+          // Gone from Drive — fall through and upload it again.
+          keep.fileId = null;
+        }
+      }
+      if (keep.fileId) return keep;
+    }
+
+    const blob = await blobSource.getBlob(ref.blobId);
+    if (!blob) return keep;
+
+    const uploaded = await drive.uploadFile({
+      name: ref.name || record.name,
+      parentId: projectMeta.assets,
+      blob,
+      mimeType: ref.type,
+      appProperties: { edgeStudioRecord: `assets:${record.id}`, edgeStudioBlobId: ref.blobId },
+    });
+    summary.created += 1;
+
+    // Replacing the bytes leaves the old file behind; trash it so the
+    // Assets folder doesn't accumulate every version of every import.
+    if (keep.fileId && keep.fileId !== uploaded.id) await drive.trash(keep.fileId);
+
+    return {
+      fileId: uploaded.id,
+      fileUrl: uploaded.webViewLink || null,
+      fileBlobId: ref.blobId,
+      fileName: uploaded.name,
+      fileSize: blob.size ?? ref.size ?? null,
+    };
+  }
+
   async function docFor(collection, record, meta, rootId) {
     if (collection === 'projects') {
       return { remote: await projectFolders(record, meta, rootId) };
@@ -189,7 +253,7 @@ export function createSyncEngine({
       return { remote: folders, doc, parentId: folders.folderId };
     }
 
-    if (collection === 'assets') return { remote: {} };
+    if (collection === 'assets') return { remote: await assetFile(record, meta, projectMeta) };
 
     let parentId;
     let format;
@@ -248,16 +312,21 @@ export function createSyncEngine({
 
     if (record.deletedAt) {
       if (meta.docId) await drive.trash(meta.docId);
+      if (meta.fileId) await drive.trash(meta.fileId);
       if (meta.folderId) await drive.trash(meta.folderId);
       if (meta.indexFileId) await writeIndex(collection, record, meta, {});
       await store.purge(collection, record.id);
-      if (meta.docId || meta.folderId) summary.trashed += 1;
+      if (meta.docId || meta.fileId || meta.folderId) summary.trashed += 1;
       return;
     }
+
+    const bytesPending =
+      collection === 'assets' && !!record.fileRef?.blobId && meta.fileBlobId !== record.fileRef.blobId;
 
     const upToDate =
       meta.syncedUpdatedAt === record.updatedAt &&
       meta.indexFileId &&
+      !bytesPending &&
       (collection === 'assets' || collection === 'projects' ? true : !!meta.docId) &&
       (collection === 'projects' || collection === 'productions' ? !!meta.folderId : true);
     if (upToDate) return;

@@ -20,6 +20,10 @@ export const state = {
 
   // Column 1
   assetQuery: '',
+  // Which asset files this machine actually holds the bytes for. A
+  // record's own `stored` flag travels with it through Drive, so it says
+  // what was true where the file was imported, not what is true here.
+  heldBlobIds: new Set(),
   assetCategory: null, // null = every category
 
   // Column 2 → column 3: which block's contribution is highlighted in

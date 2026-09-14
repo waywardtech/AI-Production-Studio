@@ -28,7 +28,7 @@ import { state } from './lib/state.js';
 import { hasUnsavedChanges, loadProject } from './lib/repository.js';
 import { registerRenderer, render, renderAll } from './lib/render.js';
 import { initScenes, renderScenes } from './lib/scenes.js';
-import { initAssets, renderAssets } from './lib/assets.js';
+import { initAssets, refreshHeldBytes, renderAssets } from './lib/assets.js';
 import { initRunOrder, renderRunOrder } from './lib/runorder.js';
 import { initShot, renderShot } from './lib/shot.js';
 import { expandScene, importMaterial, refineScene, scenesFromScript } from './lib/seed.js';
@@ -120,6 +120,9 @@ async function init() {
     onChange: async (project) => {
       await loadProject(project);
       document.title = `${project.name} — Edge Studio`;
+      // Which asset files this machine holds is per project, so it is
+      // re-read whenever the project changes.
+      await refreshHeldBytes();
       renderAll();
     },
   });

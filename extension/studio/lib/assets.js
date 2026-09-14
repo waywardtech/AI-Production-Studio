@@ -21,6 +21,18 @@ const categoriesEl = document.getElementById('asset-categories');
 const countEl = document.getElementById('asset-count');
 const fileInputEl = document.getElementById('asset-file-input');
 
+// The byte store is the authority on what can be attached, so the grid
+// asks it rather than trusting the record. Refreshed after anything that
+// adds or removes bytes.
+export async function refreshHeldBytes() {
+  state.heldBlobIds = new Set(await blobs.keys());
+}
+
+export function hasBytes(asset) {
+  const blobId = asset?.fileRef?.blobId;
+  return !!blobId && state.heldBlobIds.has(blobId);
+}
+
 export function visibleAssets() {
   const query = state.assetQuery.trim().toLowerCase();
 
@@ -85,6 +97,17 @@ async function editAsset(asset) {
     ],
     confirmLabel: 'Save',
     extraButtons: [
+      ...(asset.fileRef?.blobId && !hasBytes(asset) && !asset.fileRef.tooLarge
+        ? [
+            {
+              label: 'Fetch file',
+              onClick: async ({ cancel }) => {
+                cancel();
+                await fetchAssetBytes(asset);
+              },
+            },
+          ]
+        : []),
       {
         label: 'Delete',
         onClick: async ({ cancel }) => {
@@ -119,6 +142,7 @@ async function editAsset(asset) {
             persist(production);
           });
           if (asset.fileRef?.blobId) await blobs.remove(asset.fileRef.blobId);
+          await refreshHeldBytes();
           await deleteAsset(asset.id);
           render('assets', 'shot');
           showToast(`Deleted "${asset.name}".`);
@@ -186,17 +210,18 @@ function assetTile(asset) {
   // than at the moment Produce tries to send it.
   const ref = asset.fileRef;
   if (ref) {
+    const held = hasBytes(asset);
     const kind = document.createElement('span');
     kind.className = 'file-badge';
     kind.dataset.kind = ref.kind || 'other';
     kind.textContent = FILE_KINDS[ref.kind]?.label || 'File';
-    if (ref.stored) {
-      kind.title = `${ref.name} · ${formatBytes(ref.size)} · attachable`;
+    if (held) {
+      kind.title = `${ref.name} · ${formatBytes(ref.size)} · here, and attachable`;
     } else {
       kind.classList.add('reference-only');
       kind.title = ref.tooLarge
         ? `${ref.name} · ${formatBytes(ref.size)} — too big to hold, so it can't be attached`
-        : `${ref.name} · reference only — the file itself isn't held here`;
+        : `${ref.name} · not on this machine — open it to fetch it from Drive`;
     }
     frame.appendChild(kind);
   }
@@ -348,6 +373,7 @@ export async function ingestFiles(files, { category = null } = {}) {
   }
 
   const created = built.length ? addAssets(built) : [];
+  await refreshHeldBytes();
 
   if (created.length) {
     const held = created.filter((a) => a.fileRef?.stored).length;
@@ -373,6 +399,27 @@ async function readTextSafely(file) {
     console.error('[Edge Studio] Could not read text file:', error);
     return '';
   }
+}
+
+// Pulls an asset's bytes down from Drive. The background worker does the
+// downloading — it owns the Drive client, and pages share its IndexedDB,
+// so the file lands where the grid will see it.
+export async function fetchAssetBytes(asset) {
+  showToast(`Fetching "${asset.fileRef?.name || asset.name}" from Drive…`);
+  const result = await chrome.runtime.sendMessage({
+    type: 'EDGE_STUDIO_FETCH_ASSET_BYTES',
+    assetId: asset.id,
+  });
+
+  if (!result || !result.success) {
+    showToast(result?.reason || 'Could not fetch that file.', 'warning');
+    return false;
+  }
+
+  await refreshHeldBytes();
+  render('assets');
+  if (!result.already) showToast(`"${asset.fileRef?.name || asset.name}" is here — ${formatBytes(result.size)}.`);
+  return true;
 }
 
 async function addFromUrl() {
