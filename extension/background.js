@@ -357,7 +357,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (
     message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE' ||
     message.type === 'EDGE_STUDIO_CAPTURE_SELECTION' ||
-    message.type === 'EDGE_STUDIO_CAPTURE_USAGE'
+    message.type === 'EDGE_STUDIO_CAPTURE_USAGE' ||
+    message.type === 'EDGE_STUDIO_PROBE'
   ) {
     relayToTab(message.tabId, { type: message.type }).then(sendResponse);
     return true;

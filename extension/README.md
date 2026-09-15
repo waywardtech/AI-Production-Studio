@@ -191,9 +191,15 @@ the files wait in the composer with the prompt. A file that isn't on this
 machine, or is over the size limit, is listed but can't be ticked, so the
 reason is visible before you try.
 
-These selectors have not been checked against the live sites yet. If a
-page has nowhere to put a file, the toast says so and the prompt is still
-in the box to attach by hand.
+Whether a given site will take a file is a question about its markup, and
+**Check page** (next to Refresh, under Chat tabs) answers it: open the
+site, press it, and read what Insert, Attach and Capture would actually
+find there — which selector matched, whether there's a file input, how
+many replies it can see. Copy the report and keep it; that record, with
+its URL and date, is what "these selectors are verified" means.
+
+If a page has nowhere to put a file, the toast says so and the prompt is
+still in the box to attach by hand.
 
 ## Usage
 
@@ -203,6 +209,28 @@ publishes a usage API or reliably shows a quota, so **manual entry (✎) is
 the reliable path**; **Read from tabs** is a best-effort scan for phrasings
 like "12 messages remaining" and says plainly when it finds nothing.
 **Add service** covers anything else with a budget.
+
+## Check page
+
+Under **Chat tabs**, next to Refresh. Runs on the ticked tabs — or on
+every open one if nothing is ticked — and reports, per page:
+
+```
+Insert    ✓ #prompt-textarea (contenteditable)
+Attach    ✓ file input — input[type="file"][multiple], accept="image/*", multiple
+Capture   ✓ [data-message-author-role="assistant"] — 6 found
+Usage     — no figure shown right now
+```
+
+It uses the adapter's own selector lists and the same lookup Insert and
+Attach use, so it can't drift from what they really do: if it says a file
+input was found, that's the element an attach would go to. It also lists
+every selector tried and what each matched, which is what you need when a
+site redesigns and something stops working.
+
+The heading counts how many pages are fully supported. A page where
+attaching would fall back to pasting is honest about it rather than
+counted as working.
 
 ## Google Docs and Settings
 
@@ -296,8 +324,16 @@ sync is the confirmation.
 | Module 3: visual reference pipeline | ❌ not ticketed |
 | Module 4: production pipeline (M4-1…M4-17) | ✅ |
 | Module 4: cost estimate, continuity, more generators, contact sheet (M4-18…21) | ❌ P1 |
+| Files: import anything, byte store (M5-1) | ✅ |
+| Files: asset files in Drive (M5-2) | ✅ — live Google untested |
+| Files: import from Drive (M5-3) | ✅ — live Google untested |
+| Files: attach to a chat (M5-4) | ✅ machinery proven in Chrome; site selectors unverified |
+| Files: verify selectors on the live sites (M5-5) | ⚠️ **Check page** built; the five sites still to be checked |
+| Files: chosen Drive folder, attachment reuse (M5-6/7) | ❌ P1 |
+| Files: browser tests (M5-8) | ✅ `npm run test:browser` |
 
-Full notes per ticket: `docs/tickets-phase-0-2.md` and `docs/tickets-phase-4.md`.
+Full notes per ticket: `docs/tickets-phase-0-2.md`, `docs/tickets-phase-4.md`
+and `docs/tickets-phase-5.md`.
 
 ### Code layout
 
@@ -320,6 +356,9 @@ shared/               used by every page (and some by the background worker)
   modal.js            the one dialog every page uses
   ui.js               toasts, tab switching, clipboard, selection
   roundtrip.js        one trip through an open chat: send, wait, read
+  blobs.js            imported file bytes, in IndexedDB; the size limit
+  attach.js           sending files to a tab: chunking and encoding
+  probe-format.js     the page check, as readable lines — pure
   variables.js        <placeholder> logic — pure
 sidepanel/            Prompts, Replies, Usage (lib/: one module per concern)
 studio/               productions (lib/: model and prompt are pure)
@@ -329,8 +368,15 @@ settings/             Google Docs connection, backup and restore
 `shared/store.js` is the only durable-storage module, so no page knows or
 cares whether a record came from this browser or from Drive. Sync runs
 only in the background worker, so two open pages can never push the same
-change twice. Neither page imports the other's code. Tests are at the repo
-root: `npm test`.
+change twice. Neither page imports the other's code.
+
+Records stay small: an imported file's bytes live in `shared/blobs.js`
+(IndexedDB), and the record keeps a reference. That's why listing a
+project's assets doesn't touch a single byte of video.
+
+Tests are at the repo root: `npm test` for the Node suite, and
+`npm run test:browser` for the ones that need a real Chrome with the
+extension loaded (`tests/browser/README.md`).
 
 ### Chat and generator pages
 

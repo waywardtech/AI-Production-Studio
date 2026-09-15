@@ -28,6 +28,7 @@ import { renderLibrary, initLibrary } from './lib/library.js';
 import { refreshTabs, initTargets } from './lib/targets.js';
 import { initInsert } from './lib/insert.js';
 import { initAttachments, renderAttachmentLine } from './lib/attachments.js';
+import { initDiagnose } from './lib/diagnose.js';
 import { initOptimize } from './lib/optimize.js';
 import { renderCaptures, renderResponses, initReplies } from './lib/replies.js';
 import { loadUsage, renderUsage, updateCostEstimate, initUsage } from './lib/usage.js';
@@ -122,6 +123,7 @@ async function init() {
   initTargets();
   initInsert();
   initAttachments();
+  initDiagnose();
   initOptimize();
   initReplies();
   initUsage();

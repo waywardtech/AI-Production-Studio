@@ -295,6 +295,97 @@ function attachFiles(files) {
   return { ...attempt, platform: platform.id, platformLabel: platform.label, count: files.length };
 }
 
+// ---------- M5-5: the page check ----------
+//
+// Every selector in this file is a guess about somebody else's markup,
+// and the only way to know is to look. Rather than asking Dan to read
+// the source and poke at devtools on five sites, this reports what each
+// strategy would actually find on the page in front of him.
+//
+// It reuses findInput and the platform's own selector lists, so the
+// report can't drift away from what Insert and Attach really do — if
+// this says "file input found", that is the element they would use.
+
+function describeElement(el) {
+  if (!el) return null;
+  const attr = (name) => (typeof el.getAttribute === 'function' ? el.getAttribute(name) : null);
+  return {
+    tag: (el.tagName || '').toLowerCase() || null,
+    id: el.id || null,
+    disabled: !!el.disabled,
+    accept: attr('accept'),
+    multiple: el.multiple === true || attr('multiple') !== null,
+  };
+}
+
+function countFor(selector) {
+  try {
+    return document.querySelectorAll(selector).length;
+  } catch {
+    return 0;
+  }
+}
+
+function probePage() {
+  const platform = currentPlatform();
+  if (!platform) {
+    return { success: false, reason: 'Edge Studio does not handle this site.', url: location.href };
+  }
+
+  const inputTried = platform.inputSelectors.map((selector) => ({ selector, count: countFor(selector) }));
+  const target = findInput(platform);
+  const input = target
+    ? { selector: inputTried.find((t) => t.count > 0)?.selector || null, kind: target.kind, element: describeElement(target.el) }
+    : null;
+
+  const fileSelectors = platform.fileInputSelectors || ['input[type="file"]'];
+  const fileTried = fileSelectors.map((selector) => {
+    let elements = [];
+    try {
+      elements = [...document.querySelectorAll(selector)];
+    } catch {
+      elements = [];
+    }
+    const usable = elements.filter((el) => !el.disabled);
+    return {
+      selector,
+      count: elements.length,
+      usable: usable.length,
+      first: describeElement(usable[0] || elements[0]),
+    };
+  });
+
+  const firstUsableFile = fileTried.find((entry) => entry.usable > 0) || null;
+
+  // The same order attachFiles tries, reported without touching anything.
+  let attachPlan = 'none';
+  if (firstUsableFile) attachPlan = 'file-input';
+  else if (target) attachPlan = 'paste';
+
+  const assistantTried =
+    platform.assistantSelectors.map((selector) => ({ selector, count: countFor(selector) }));
+  const fallbackCount = platform.assistantFallback ? platform.assistantFallback().length : null;
+
+  const usage = captureUsage();
+
+  return {
+    success: true,
+    at: new Date().toISOString(),
+    url: location.href,
+    title: document.title,
+    platform: { id: platform.id, label: platform.label, kind: platform.kind || 'chat' },
+    input,
+    inputTried,
+    fileTried,
+    fileInput: firstUsableFile,
+    attachPlan,
+    assistantTried,
+    assistantFallback: fallbackCount,
+    assistantFound: assistantTried.some((t) => t.count > 0) || (fallbackCount || 0) > 0,
+    usage: usage.success ? { found: true, raw: usage.raw } : { found: false },
+  };
+}
+
 // ---------- M2-1 / M2-2: response and selection capture ----------
 
 function findAssistantTurns(platform) {
@@ -453,6 +544,10 @@ if (!window.__edgeStudioAdapterListenerRegistered) {
 
     if (message.type === 'EDGE_STUDIO_ATTACH_COMMIT') {
       sendResponse(commitTransfer(message.transferId));
+    }
+
+    if (message.type === 'EDGE_STUDIO_PROBE') {
+      sendResponse(probePage());
     }
 
     if (message.type === 'EDGE_STUDIO_CAPTURE_RESPONSE') {

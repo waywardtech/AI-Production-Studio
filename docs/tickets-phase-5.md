@@ -29,9 +29,16 @@ Send an asset's file into the tab alongside the prompt.
 *Acceptance:* Files reach the composer and wait there; a page with nowhere to put them says so rather than failing silently.
 *Built as:* Bytes cross page → worker → content script as base64 in ~1.5 MB chunks, assembled into Files only at commit. Three strategies in order: the page's own file input, a paste on the composer, a drop on the composer. Produce attaches a shot's still and references; the side panel has a picker for the next Insert. Nothing is ever sent.
 
-**M5-5 — Selector verification on the live sites** ❌ *Not started*
+**M5-5 — Selector verification on the live sites** ⚠️ *Tooling built; the sites themselves still unverified*
 The attachment selectors, and the generator input selectors before them, have only been exercised against stubs.
-*Acceptance:* Each of ChatGPT, Claude, Gemini, Sora and Flow confirmed by hand, with the working selector recorded.
+*Acceptance:* Each of ChatGPT, Claude, Gemini, Sora and Flow confirmed, with the working selector recorded.
+*Built as:* **Check page** in the side panel. It runs the adapter's own probe on the ticked tabs and reports what Insert, Attach and Capture would find — the matching selector, whether there is a usable file input and what it accepts, how many replies are visible — plus every selector tried and its count. The report carries the URL and a timestamp and is meant to be copied out: that is the record the acceptance line asks for.
+*Still open:* running it on the five sites while signed in, and pasting the results here. Nothing in the extension can do that part.
+
+**M5-8 — Browser tests** ✅ *Implemented*
+The Node suite can't reach IndexedDB, thumbnails, file drops, or the page → worker → content-script path, which is most of the file work.
+*Acceptance:* Those paths are covered against a real Chrome with the extension loaded.
+*Built as:* `tests/browser/`, run with `npm run test:browser` (playwright-core, installed on demand, not part of `npm test`). Covers intake and the byte store, the page check, and a file travelling all the way into a page's file input — including one larger than a single message, checked byte-for-byte on arrival. Chat pages are stand-ins routed on `chatgpt.com`, so the content script runs for real: it proves the machinery, not anyone's markup.
 
 **M5-6 — Per-project Drive asset folder of Dan's choosing (P1)** ❌ *Not started*
 Point a project at a folder that already exists rather than the one Edge Studio makes. Needs the full `drive` scope — decision #21.
