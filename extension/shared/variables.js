@@ -9,7 +9,7 @@
 // A name must look like an identifier: it starts with a letter or
 // underscore and continues with letters, digits, hyphens or
 // underscores. That deliberately excludes things that merely happen to
-// sit inside angle brackets — </closing> tags, <dan@thefaredge.com>,
+// sit inside angle brackets — </closing> tags, <you@example.com>,
 // <https://example.com>, Map<string,int> — none of which are variables
 // and none of which Dan should be asked to fill in.
 //

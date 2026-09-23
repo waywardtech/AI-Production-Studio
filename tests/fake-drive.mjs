@@ -92,7 +92,7 @@ export function createFakeDrive() {
     const idMatch = path.match(/\/files\/([^/]+)(\/export)?$/);
 
     if (method === 'GET' && path === '/drive/v3/about') {
-      return respond(200, { user: { emailAddress: 'dan@thefaredge.com', displayName: 'Dan' } });
+      return respond(200, { user: { emailAddress: 'studio@example.com', displayName: 'Dan' } });
     }
 
     if (method === 'GET' && path === '/drive/v3/files') {

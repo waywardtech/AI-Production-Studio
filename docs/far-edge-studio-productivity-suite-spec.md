@@ -1,7 +1,7 @@
 # Far Edge Studio Productivity Suite — Product Spec (v0.1 Draft)
 
 **Owner:** Dan (The Far Edge)
-**Primary account:** dan@thefaredge.com
+**Primary account:** the studio's Google account
 **Status:** Brain-dump captured, unscoped — for structure review before build starts
 
 ---
@@ -42,7 +42,7 @@ Every module reads and writes through the Core repository rather than keeping it
 Every module needs the same three things — who's logged in, where files live, and a consistent place to store prompts/responses/assets. Building this once avoids each module reinventing storage and creating inconsistent data.
 
 ### Goals
-- Single sign-on with dan@thefaredge.com (Google account) unlocks every module
+- Single sign-on with the studio's Google account unlocks every module
 - Google Drive functions as the system of record — no separate database to keep in sync
 - A shared repository schema (prompts, responses, chat archives, visual assets) that every module reads/writes against
 - Documents are referenced by link rather than duplicated, so there's one canonical copy of any given asset

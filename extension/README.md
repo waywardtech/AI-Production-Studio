@@ -16,6 +16,58 @@ box for you.
 3. Click the Edge Studio toolbar icon. The side panel opens with a short
    "How Edge Studio works" guide at the top.
 
+## Permissions and privacy
+
+Edge Studio has no server and no account. Everything it knows lives in
+your browser, and the only place any of it can travel to is your own
+Google Drive, after you connect it in Settings.
+
+**What leaves the browser.** Two hosts, and only once Google is
+connected: `googleapis.com` for Drive, and `oauth2.googleapis.com` to
+sign in and to revoke the token on Disconnect. That is the complete list
+of network calls in the extension. There is no analytics, no telemetry,
+no error reporting, and no third-party code — Manifest V3 forbids loading
+remote scripts, and nothing here tries to.
+
+**What it never does.** It never calls an AI model. A prompt is written
+into a chat tab you already have open and left in the input box; you
+press send. The same goes for a file attached to a prompt, and for
+Produce handing a shot to Sora or Veo. Nothing is submitted on your
+behalf, so nothing is ever spent without you doing it.
+
+**Where your work is kept.** Records — projects, prompts, replies,
+productions, assets, documents — in `chrome.storage.local`, one key each.
+Imported file bytes in IndexedDB, because they are too big to belong in
+a record. Tab labels and Google access tokens in `storage.session`, which
+Chrome clears when the browser closes, so a token is never written to
+disk.
+
+**On the chat pages.** The content script runs on six URL patterns and
+nowhere else: ChatGPT (two hosts), Claude, Gemini, Sora and Flow. On
+those pages it reads the composer to put a prompt in, reads replies when
+you capture one, reads a usage figure if the page happens to show one,
+and hands over files you chose to attach. It does not watch you type, and
+it sends nothing anywhere — the side panel asks it for something and it
+answers.
+
+**Google scopes.** `drive.file` covers only files Edge Studio itself
+created — never the rest of your Drive — and `drive.appdata` is a hidden
+folder for its index. Neither is a sensitive scope. Importing media you
+already have in Drive needs `drive.readonly`, which is a separate grant,
+asked for only when you turn on **Allow Drive browsing** in Settings, and
+used only to read the files you pick. The OAuth client ID is one you
+create under your own Google account; there is no key bundled here.
+
+| Permission | Why it's there |
+|---|---|
+| `storage`, `unlimitedStorage` | Your records, and the imported files behind your assets |
+| `tabs` | Finding your open chat and generator tabs, and telling them apart |
+| `scripting` | Reaching a tab that was already open when the extension loaded — a manifest content script only runs on navigation |
+| `sidePanel` | The side panel itself |
+| `clipboardWrite` | The fallback when a page won't take an insert |
+| `identity` | Google sign-in, via `launchWebAuthFlow` |
+| `alarms` | The five-minute sync tick |
+
 ## How it's organised
 
 **Projects.** Everything belongs to a project — a client, a show, a
@@ -69,7 +121,7 @@ occurrence; the saved prompt keeps the placeholder for next time, and the
 last value you used is prefilled.
 
 - A name must look like an identifier, so `</closing>` tags,
-  `<dan@thefaredge.com>`, `<https://…>` and `Map<string,int>` are left
+  `<you@example.com>`, `<https://…>` and `Map<string,int>` are left
   alone.
 - **Blank means leave it as-is** — `<li>` or `Array<string>` look like
   variables, so they appear in the form; leave them blank and they pass

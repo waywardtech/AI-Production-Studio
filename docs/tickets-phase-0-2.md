@@ -7,7 +7,7 @@ Derived from `far-edge-studio-productivity-suite-spec.md`. Covers **Phase 0 (Cor
 ## Epic: Phase 0 — Core Platform Layer
 
 **CORE-1 — Google OAuth login flow** ✅ *Implemented*
-Implement Google OAuth 2.0 sign-in scoped to Drive read/write, for dan@thefaredge.com.
+Implement Google OAuth 2.0 sign-in scoped to Drive read/write, for the studio's Google account.
 *Acceptance:* User can sign in; token refresh handled silently; only Drive scopes requested.
 *Built as:* Settings → Connect, via chrome.identity.launchWebAuthFlow with a Web-application client ID pasted into Settings (no manifest edit). Scopes are drive.file + drive.appdata — narrower than read/write on all of Drive, and non-sensitive. Tokens renew silently and live in session storage; if Google needs a click, sync pauses with Reconnect.
 

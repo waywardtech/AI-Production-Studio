@@ -17,6 +17,42 @@ waits in the input box.
 **Start here:** [`extension/README.md`](extension/README.md) — install,
 the everyday workflow, and each part in detail.
 
+## What it does with your data
+
+Short version: your work stays in your browser, and the only place it can
+go is your own Google Drive, once you connect it.
+
+- **Nothing is sent to us, or to anyone.** There is no server, no account,
+  no analytics, no telemetry, no crash reporting, no third-party code.
+- **The only network calls the extension makes** are to `googleapis.com`
+  (your Drive) and `oauth2.googleapis.com` (signing in and out). Both
+  happen only after you connect Google, using an OAuth client ID you
+  create under your own Google account. There is no bundled key.
+- **It never calls an AI model.** Prompts are written into a chat tab you
+  already have open, and left in the input box for you to send. Nothing is
+  submitted on your behalf, so nothing is ever spent without you pressing
+  send.
+- **Your work is stored locally** — records in `chrome.storage.local`,
+  imported file bytes in IndexedDB — and mirrored to Drive only when you
+  connect it. Access tokens are kept in session storage and go when the
+  browser closes.
+
+It runs on the five sites it works with, and nowhere else:
+
+| Permission | Why |
+|---|---|
+| `chatgpt.com`, `chat.openai.com`, `claude.ai`, `gemini.google.com`, `sora.chatgpt.com`, `labs.google/fx` | Read the page to put a prompt in the box and capture the replies you ask it to |
+| `googleapis.com`, `oauth2.googleapis.com` | Google Drive, after you connect it |
+| `storage`, `unlimitedStorage` | Your projects, prompts, replies and imported files |
+| `tabs`, `scripting` | Find your open chat tabs, and reach ones that were open before the extension loaded |
+| `sidePanel`, `clipboardWrite`, `alarms` | The panel, the clipboard fallback, the periodic sync |
+| `identity` | Google sign-in |
+
+Google access is asked for narrowly: `drive.file` (only files Edge Studio
+itself creates) and `drive.appdata` (a hidden index). Browsing your
+existing Drive to import media needs `drive.readonly`, which is asked for
+separately and only if you turn it on in Settings.
+
 ## Layout
 
 ```
