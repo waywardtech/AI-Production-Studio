@@ -61,7 +61,9 @@ docs/
   far-edge-studio-productivity-suite-spec.md   the product spec: Core and Modules 1–4
   tickets-phase-0-2.md                          tickets for Core, Module 1 and Module 2
   tickets-phase-4.md                            tickets for Module 4
-tests/         `npm test` (Node, no dependencies); tests/harness for driving pages in a browser
+  tickets-phase-5.md                            tickets for media files and attachments
+tests/         `npm test` (Node, no dependencies)
+               `npm run test:browser` (the extension loaded into a real Chrome)
 ```
 
 ## Status
@@ -75,6 +77,14 @@ tests/         `npm test` (Node, no dependencies); tests/harness for driving pag
 | **Module 2** — reply capture, save, reuse, send to the studio | Built; Gemini native save and the reformat pipeline open |
 | **Module 3** — visual reference pipeline | Spec'd, not ticketed |
 | **Module 4** — production pipeline: scenes, assets, shot builder, Produce, review, dailies | Built; P1 extras open |
+| **Files** — import media, scripts and documents from your disk or your Drive; keep them; send them to a chat with the prompt | Built; the attach selectors are unverified on the live sites — **Check page** in the side panel reports what each one would find |
 
 Ticket-by-ticket detail is in the extension README's reference section and
 in `docs/`.
+
+Two honest caveats, both about things that can only be confirmed against
+live services: Google Docs sync has run against a simulated Drive but not
+yet against Google, and the selectors that reach into each chat page are
+guesses about somebody else's markup until checked. **Check page**, in
+the side panel, reports what Insert, Attach and Capture would actually
+find on whatever page is in front of you.
