@@ -62,6 +62,7 @@ docs/
   tickets-phase-0-2.md                          tickets for Core, Module 1 and Module 2
   tickets-phase-4.md                            tickets for Module 4
   tickets-phase-5.md                            tickets for media files and attachments
+HARNESS_CHANGELOG.md   what stops it waiting forever: the timeout and watchdog rules
 tests/         `npm test` (Node, no dependencies)
                `npm run test:browser` (the extension loaded into a real Chrome)
 ```

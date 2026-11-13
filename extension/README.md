@@ -408,6 +408,9 @@ shared/               used by every page (and some by the background worker)
   modal.js            the one dialog every page uses
   ui.js               toasts, tab switching, clipboard, selection
   roundtrip.js        one trip through an open chat: send, wait, read
+  reply-watcher.js    the wait itself: one ask at a time, stops if idle — pure
+  relay.js            page → content script; always answers, within a bound
+  watchdog.js         deadlines and the single-flight lock — pure
   blobs.js            imported file bytes, in IndexedDB; the size limit
   attach.js           sending files to a tab: chunking and encoding
   probe-format.js     the page check, as readable lines — pure
@@ -425,6 +428,11 @@ change twice. Neither page imports the other's code.
 Records stay small: an imported file's bytes live in `shared/blobs.js`
 (IndexedDB), and the record keeps a reference. That's why listing a
 project's assets doesn't touch a single byte of video.
+
+Nothing waits forever: every Drive request, every message to a tab and
+every wait for a reply has a bound, and a stall comes back as an ordinary
+failure. The rules, and the tests that pin them, are in
+`HARNESS_CHANGELOG.md` at the repo root.
 
 Tests are at the repo root: `npm test` for the Node suite, and
 `npm run test:browser` for the ones that need a real Chrome with the
