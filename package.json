@@ -4,7 +4,10 @@
   "description": "Edge Studio — prompt composer, reply manager and production pipeline for The Far Edge studio.",
   "type": "module",
   "scripts": {
-    "test": "node tests/run.mjs",
-    "test:browser": "node tests/browser/run.mjs"
+    "test": "node tests/run.mjs && node pipeline/tests/run.mjs",
+    "test:extension": "node tests/run.mjs",
+    "test:pipeline": "node pipeline/tests/run.mjs",
+    "test:browser": "node tests/browser/run.mjs",
+    "studio": "node pipeline/server.mjs"
   }
 }

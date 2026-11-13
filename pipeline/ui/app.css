@@ -1,0 +1,84 @@
+:root {
+  --bg: #15161a; --panel: #1c1d22; --raised: #24262d; --line: #32343c; --text: #e7e7ea; --dim: #8d8f99;
+  --accent: #6c8cff; --ok: #5fbf82; --warn: #e0a04a; --bad: #e0685f; --master: #c79bf2;
+}
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr 170px; background: var(--bg); color: var(--text);
+  font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+h1 { font-size: 15px; margin: 0; } h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin: 0 0 8px; }
+button, select, input, textarea { font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+button { cursor: pointer; } button:hover { border-color: var(--accent); } button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.warn { border-color: var(--warn); color: var(--warn); }
+button.small { padding: 2px 7px; font-size: 11px; }
+textarea, input[type=text] { width: 100%; }
+
+header { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.views button { border-radius: 0; } .views button:first-child { border-radius: 6px 0 0 6px; } .views button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.views button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.spacer { flex: 1; } .delivery { color: var(--dim); font-size: 12px; } .chaos { color: var(--dim); font-size: 11px; display: flex; gap: 6px; align-items: center; }
+
+main { display: grid; grid-template-columns: 220px minmax(0, 1fr) 400px; min-height: 0; }
+aside, #stage, footer { overflow: auto; padding: 12px; } #vault { border-right: 1px solid var(--line); } #inspector { border-left: 1px solid var(--line); background: var(--panel); }
+footer { border-top: 1px solid var(--line); background: var(--panel); }
+.empty { color: var(--dim); }
+
+/* Story Bible */
+.entity { border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; margin-bottom: 6px; background: var(--panel); cursor: pointer; }
+.entity:hover, .entity.open { border-color: var(--accent); }
+.entity .kind { font-size: 10px; text-transform: uppercase; color: var(--dim); letter-spacing: .05em; }
+.entity .meta { font-size: 11px; color: var(--dim); }
+.entity form { margin-top: 8px; display: grid; gap: 5px; } .entity label { font-size: 10px; color: var(--dim); text-transform: uppercase; }
+
+/* Storyboard — a card's width is its duration, so the strip reads as time */
+.scene { margin-bottom: 18px; } .scene h3 { margin: 0 0 2px; font-size: 13px; } .scene .beat { color: var(--dim); font-size: 12px; margin-bottom: 8px; }
+.strip { display: flex; gap: 8px; align-items: flex-start; }
+.shot { flex: var(--dur) 1 0; min-width: 130px; border: 2px solid var(--line); border-radius: 8px; background: var(--panel); padding: 6px; cursor: pointer; position: relative; }
+.shot.selected { box-shadow: 0 0 0 2px var(--accent); }
+/* A fixed height: cards differ in width (that is the duration) and
+   would otherwise differ in height too. */
+.shot .thumb { height: 118px; background: #0e0f12; border-radius: 4px; overflow: hidden; display: grid; place-items: center; color: var(--dim); font-size: 11px; }
+.shot .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot .name { font-weight: 600; margin-top: 5px; display: flex; justify-content: space-between; gap: 6px; }
+.shot .sub { font-size: 11px; color: var(--dim); }
+.badge { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 9px; border: 1px solid currentColor; white-space: nowrap; }
+.state-empty { color: var(--dim); } .state-draft { color: var(--accent); } .state-approved { color: var(--ok); } .state-mastered { color: var(--master); }
+.state-stale { color: var(--warn); }
+.shot.is-stale { border-color: var(--warn); border-style: dashed; }
+.shot.is-mastered { border-color: var(--master); } .shot.is-approved { border-color: var(--ok); }
+.ripple { font-size: 11px; color: var(--warn); margin-top: 3px; }
+/* The ripple: shots downstream of the Bible entry being hovered or edited */
+.shot.downstream { outline: 2px solid var(--warn); outline-offset: 2px; }
+
+/* Graph */
+#graph svg { width: 100%; min-height: 420px; }
+#graph .node rect { fill: var(--raised); stroke: var(--line); rx: 6; } #graph .node text { fill: var(--text); font-size: 11px; }
+#graph .node.shot { cursor: pointer; } #graph .node.stale rect { stroke: var(--warn); stroke-dasharray: 4 3; }
+#graph .node.approved rect { stroke: var(--ok); } #graph .node.mastered rect { stroke: var(--master); } #graph .node.draft rect { stroke: var(--accent); }
+#graph .edge { stroke: var(--line); fill: none; stroke-width: 1.2; } #graph .edge.stale { stroke: var(--warn); stroke-width: 2; stroke-dasharray: 5 3; }
+#graph .col { fill: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+
+/* Inspector */
+#inspector h3 { margin: 14px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); display: flex; justify-content: space-between; }
+.row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+.clause { display: grid; grid-template-columns: 62px 1fr auto; gap: 6px; align-items: start; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.clause .key { color: var(--accent); font-size: 10px; text-transform: uppercase; padding-top: 2px; } .clause .src { color: var(--dim); font-size: 10px; }
+.clause.dropped .text { text-decoration: line-through; color: var(--dim); } .clause.locked .key { color: var(--warn); }
+.budget { font-size: 11px; color: var(--dim); } .budget.over { color: var(--bad); }
+.note { border-left: 3px solid var(--warn); padding: 3px 8px; margin: 4px 0; font-size: 12px; background: var(--raised); border-radius: 0 4px 4px 0; }
+.note.block { border-color: var(--bad); } .note.fix { border-color: var(--accent); } .note.info { border-color: var(--line); color: var(--dim); }
+.diff { font-size: 12px; margin: 3px 0; } .diff del { color: var(--bad); } .diff ins { color: var(--ok); text-decoration: none; }
+.refs { display: flex; gap: 6px; flex-wrap: wrap; } .refs figure { margin: 0; width: 84px; font-size: 10px; color: var(--dim); } .refs img { width: 100%; border-radius: 4px; display: block; }
+.take { border: 1px solid var(--line); border-radius: 6px; padding: 6px; margin-bottom: 8px; background: var(--bg); }
+.take.approved { border-color: var(--ok); } .take .head { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 4px; }
+.take img { width: 100%; display: block; border-radius: 4px; }
+/* A/B wipe: the master sits on top, clipped to the slider position */
+.wipe { position: relative; border-radius: 4px; overflow: hidden; } .wipe .top { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--cut, 50%)); }
+.wipe .top img { height: 100%; object-fit: cover; } .wipe .bar { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 2px; background: #fff; pointer-events: none; }
+.wipe .tag { position: absolute; bottom: 4px; font-size: 9px; background: rgba(0,0,0,.6); padding: 1px 5px; border-radius: 3px; } .wipe .tag.a { left: 4px; } .wipe .tag.b { right: 4px; color: var(--master); }
+.take input[type=range] { width: 100%; padding: 0; margin-top: 4px; }
+
+/* Jobs */
+.job { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.job .advice { color: var(--dim); font-size: 11px; } .s-succeeded { color: var(--ok); } .s-failed { color: var(--bad); } .s-running { color: var(--accent); } .s-queued { color: var(--dim); }
+#toast { position: fixed; bottom: 186px; right: 16px; max-width: 420px; background: var(--raised); border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(0,0,0,.5); z-index: 5; }

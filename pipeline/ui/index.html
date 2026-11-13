@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Production Studio</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header>
+    <h1>Production Studio</h1>
+    <nav class="views" role="tablist">
+      <button data-view="board" class="active" role="tab">Storyboard</button>
+      <button data-view="graph" role="tab">Dependency graph</button>
+    </nav>
+    <span id="delivery" class="delivery"></span>
+    <span class="spacer"></span>
+    <button id="rerender-stale" class="warn" hidden></button>
+    <button id="promote-approved" hidden></button>
+    <label class="chaos">Simulate
+      <select id="chaos">
+        <option value="none">healthy models</option>
+        <option value="flaky">first attempt fails</option>
+        <option value="video-down">video model down</option>
+      </select>
+    </label>
+  </header>
+
+  <main>
+    <aside id="vault"><h2>Story Bible</h2><div id="bible"></div></aside>
+    <section id="stage">
+      <div id="board" class="view"></div>
+      <div id="graph" class="view" hidden></div>
+    </section>
+    <aside id="inspector"><p class="empty">Select a shot to inspect its prompt, references and takes.</p></aside>
+  </main>
+
+  <footer><h2>Jobs</h2><div id="jobs"></div></footer>
+  <div id="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

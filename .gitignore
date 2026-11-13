@@ -1,2 +1,3 @@
 .browser-test/
 node_modules/
+pipeline/.data/
