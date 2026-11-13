@@ -24,6 +24,7 @@ files go to `.browser-test/`, which is ignored.
 | `page-check.browser.mjs` | **Check page** against a page the content script really runs on |
 | `attachments.browser.mjs` | A file going all the way from the studio into a page's file input, including one larger than a single message |
 | `stall-relay.browser.mjs` | A tab whose main thread is genuinely locked: Insert gives up on it at the relay's deadline and reaches the clipboard fallback. Takes ~20 s, because the real 15 s deadline has to run out |
+| `roundtrip.browser.mjs` | A whole round trip through a chat tab: Optimize writes its request, the waiting dialog ignores the answer already on screen, waits out one that is still streaming, and hands it over whole |
 
 ## The stand-in chat page
 

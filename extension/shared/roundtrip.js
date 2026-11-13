@@ -9,10 +9,8 @@
 
 import { openModal } from './modal.js';
 import { showToast, copyToClipboard } from './ui.js';
-
-const POLL_MS = 2000;
-// Two unchanged polls before the answer counts as finished.
-const STABLE_TICKS = 2;
+import { IDLE_LIMIT_MS, createReplyWatcher } from './reply-watcher.js';
+import { formatDuration } from './watchdog.js';
 
 // Tabs come with their session labels from shared/tabs.js, so a picker
 // here names a tab exactly as the side panel does.
@@ -35,48 +33,48 @@ export async function sendToTab(tabId, text) {
   return !!(sent && sent.success);
 }
 
-// Polls the worker tab until its latest answer differs from the
-// baseline and has stopped growing — a streaming answer would otherwise
-// be scraped half-written.
+// Shows the waiting dialog and watches the worker tab until its latest
+// answer differs from the baseline and has stopped growing — a streaming
+// answer would otherwise be scraped half-written.
+//
+// The watching itself is shared/reply-watcher.js: one ask at a time, and
+// it stops asking if nothing changes for ten minutes. When that happens
+// the dialog stays open and says so, rather than closing on a guess —
+// "Use latest now" still reads the tab afresh, and Cancel still cancels.
 export function waitForReply(tabId, baseline, intro, title = 'Waiting for the reply') {
-  let lastSeen = null;
-  let stableTicks = 0;
-  let captured = null;
-  let timer = null;
+  let watcher = null;
 
   return openModal({
     title,
     body: `${intro}\n\nWatching for the answer…`,
     confirmLabel: 'Use latest now',
     onOpen: (api) => {
-      timer = setInterval(async () => {
-        const text = await captureFromTab(tabId);
-        if (!text || text === baseline) return;
+      watcher = createReplyWatcher({
+        capture: () => captureFromTab(tabId),
+        baseline,
+        onChange: () => api.setBody(`${intro}\n\nAnswer arriving — waiting for it to finish…`),
+      });
 
-        if (text === lastSeen) {
-          stableTicks += 1;
-          if (stableTicks >= STABLE_TICKS) {
-            captured = text;
-            clearInterval(timer);
-            api.confirm();
-          }
-        } else {
-          lastSeen = text;
-          stableTicks = 0;
-          api.setBody(`${intro}\n\nAnswer arriving — waiting for it to finish…`);
+      watcher.done.then((outcome) => {
+        if (outcome.status === 'settled') api.confirm();
+        if (outcome.status === 'gave-up') {
+          api.setBody(
+            `${intro}\n\nStopped watching: nothing has changed in that tab for ${formatDuration(IDLE_LIMIT_MS)}. ` +
+              'Once the answer is there, press "Use latest now" — or Cancel.'
+          );
         }
-      }, POLL_MS);
-      // However the dialog closes — poller, "Use latest now", Cancel or
-      // Escape — the interval is cleared in the .then() below.
+      });
+      // However the dialog closes — the watcher, "Use latest now",
+      // Cancel or Escape — the watcher is stopped in the .then() below.
     },
   }).then(async (result) => {
-    clearInterval(timer);
+    if (watcher) watcher.stop();
     if (result === null) {
       showToast('Cancelled.', 'warning');
       return null;
     }
-    // Either the poller settled it, or Dan forced it early.
-    const text = captured || lastSeen || (await captureFromTab(tabId));
+    // Either the watcher settled it, or Dan forced it early.
+    const text = (watcher && watcher.latest()) || (await captureFromTab(tabId));
     if (!text || text === baseline) {
       showToast('No new reply found in that tab yet.', 'warning');
       return null;
