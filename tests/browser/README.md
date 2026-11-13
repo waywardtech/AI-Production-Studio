@@ -23,6 +23,7 @@ files go to `.browser-test/`, which is ignored.
 | `intake.browser.mjs` | Importing a mixed batch: what becomes an asset, what becomes an In-box script, where the bytes go, thumbnails, delete, and the Drive permission message |
 | `page-check.browser.mjs` | **Check page** against a page the content script really runs on |
 | `attachments.browser.mjs` | A file going all the way from the studio into a page's file input, including one larger than a single message |
+| `stall-relay.browser.mjs` | A tab whose main thread is genuinely locked: Insert gives up on it at the relay's deadline and reaches the clipboard fallback. Takes ~20 s, because the real 15 s deadline has to run out |
 
 ## The stand-in chat page
 

@@ -9,6 +9,7 @@ import { createDrive } from './shared/drive.js';
 import { canBrowse, getAccessToken, invalidateToken } from './shared/google-auth.js';
 import { clearStaleSyncing, createSyncEngine } from './shared/sync.js';
 import { createSingleFlight } from './shared/watchdog.js';
+import { createRelay } from './shared/relay.js';
 import { blobs, isTooLarge, newBlobId } from './shared/blobs.js';
 import { assembleSegments, profileById, segmentText, targetById } from './studio/lib/prompt.js';
 
@@ -180,37 +181,12 @@ async function findChatTabs() {
 // Everything that talks to the page — injecting a prompt, capturing a
 // response, capturing a selection — goes through relayToTab so they all
 // get the same recovery behaviour.
-async function sendToAdapter(tabId, message) {
-  const response = await chrome.tabs.sendMessage(tabId, message);
-  return response ?? { success: false, reason: 'No response from content script.' };
-}
-
-async function relayToTab(tabId, message) {
-  try {
-    return await sendToAdapter(tabId, message);
-  } catch (error) {
-    // The content script isn't reachable on this tab. The usual cause is
-    // a tab that was already open when the extension was installed or
-    // reloaded: manifest content scripts only run on navigation, so
-    // those tabs never got one.
-    //
-    // That's recoverable without asking Dan to reload anything — inject
-    // the script programmatically, then retry the message. This is what
-    // the "scripting" permission is for; only if this also fails do we
-    // report failure and let the side panel use the M1-9 clipboard
-    // fallback (genuine cases: the tab is on a URL we have no host
-    // permission for, or it's mid-navigation).
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content-scripts/chat-adapter.js'],
-      });
-      return await sendToAdapter(tabId, message);
-    } catch (retryError) {
-      return { success: false, reason: retryError.message };
-    }
-  }
-}
+// The relay itself lives in shared/relay.js, where it can be tested: it
+// always answers, and always within a bound, even when the tab doesn't.
+const relayToTab = createRelay({
+  sendMessage: (tabId, message) => chrome.tabs.sendMessage(tabId, message),
+  executeScript: (injection) => chrome.scripting.executeScript(injection),
+});
 
 // An asset imported on another machine arrives as a record with no
 // bytes behind it. The file is in Drive, so fetch it on demand rather
