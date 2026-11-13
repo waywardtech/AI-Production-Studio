@@ -9,8 +9,18 @@
 // against a simulated Drive; in the extension they're window.fetch and
 // shared/google-auth.js.
 
+import { withDeadline } from './watchdog.js';
+
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+
+// How long any one Drive request may take, token renewal included. fetch
+// has no deadline of its own: without these, a request that Google (or
+// the network in between) never answers would never settle, and the
+// sync that issued it would hold its lock for good.
+export const REQUEST_TIMEOUT_MS = 30 * 1000;
+// Moving an asset's bytes is allowed longer — up to 50 MB each way.
+export const TRANSFER_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder';
 export const DOC_MIME = 'application/vnd.google-apps.document';
@@ -70,8 +80,26 @@ export function normalizeExportedText(text) {
   return String(text || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
 }
 
-export function createDrive({ fetchImpl, auth }) {
-  async function request(method, url, { query, json, body, contentType, parse = 'json', retried = false } = {}) {
+export function createDrive({
+  fetchImpl,
+  auth,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+  transferTimeoutMs = TRANSFER_TIMEOUT_MS,
+  timers = globalThis,
+}) {
+  // Every request runs under one deadline that covers the token, the
+  // call, the single 401 retry and reading the body. On expiry the
+  // fetch is aborted and the caller gets a StallError — an ordinary
+  // failure, where there used to be a wait with no end.
+  function request(method, url, options = {}) {
+    return withDeadline((signal) => attempt(method, url, options, signal), {
+      ms: options.timeout ?? timeoutMs,
+      what: `Google Drive (${method.toLowerCase()})`,
+      timers,
+    });
+  }
+
+  async function attempt(method, url, { query, json, body, contentType, parse = 'json', retried = false } = {}, signal) {
     const full = new URL(url);
     Object.entries(query || {}).forEach(([key, value]) => {
       if (value !== undefined && value !== null) full.searchParams.set(key, value);
@@ -86,13 +114,13 @@ export function createDrive({ fetchImpl, auth }) {
       headers['Content-Type'] = contentType;
     }
 
-    const response = await fetchImpl(full.href, { method, headers, body: payload });
+    const response = await fetchImpl(full.href, { method, headers, body: payload, signal });
 
     // A token that looked valid but was rejected (revoked, or the clock is
     // off): drop it and try exactly once more with a fresh one.
     if (response.status === 401 && !retried) {
       await auth.invalidateToken();
-      return request(method, url, { query, json, body, contentType, parse, retried: true });
+      return attempt(method, url, { query, json, body, contentType, parse, retried: true }, signal);
     }
 
     if (!response.ok) {
@@ -241,6 +269,7 @@ export function createDrive({ fetchImpl, auth }) {
         query: { uploadType: 'multipart', fields: FILE_FIELDS },
         body,
         contentType,
+        timeout: transferTimeoutMs,
       });
     },
 
@@ -249,6 +278,7 @@ export function createDrive({ fetchImpl, auth }) {
         return await request('GET', `${API}/files/${encodeURIComponent(id)}`, {
           query: { alt: 'media' },
           parse: 'blob',
+          timeout: transferTimeoutMs,
         });
       } catch (error) {
         if (error instanceof DriveError && error.status === 404) return null;

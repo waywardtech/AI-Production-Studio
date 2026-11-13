@@ -47,6 +47,7 @@ import {
 } from './docs-format.js';
 import { DriveError } from './drive.js';
 import { NeedsReconnectError } from './google-auth.js';
+import { StallError } from './watchdog.js';
 
 export const ROOT_FOLDER_NAME = 'Edge Studio';
 export const INDEX_SCHEMA = 1;
@@ -72,6 +73,14 @@ export function createSyncEngine({
   now = () => new Date().toISOString(),
 } = {}) {
   let summary;
+
+  // Called between steps of a run. It does two jobs for the watchdog in
+  // the background worker: it reports progress, so a long sync that is
+  // still moving is left alone, and it checks whether this run has been
+  // given up on. A run that stalled and was replaced must not pick up
+  // where it left off if it ever un-sticks — two runs writing at once is
+  // how a Doc gets created twice.
+  let checkpoint = () => {};
 
   // ---------- folders ----------
 
@@ -356,6 +365,7 @@ export function createSyncEngine({
   async function pull() {
     const files = await drive.appData.list();
     for (const file of files) {
+      checkpoint();
       const props = file.appProperties || {};
       const collection = props.edgeStudioCollection;
       const id = props.edgeStudioId;
@@ -422,6 +432,7 @@ export function createSyncEngine({
     const blockTypes = app.blockTypes || DEFAULT_BLOCK_TYPES;
 
     for (const { collection, record, meta } of candidates) {
+      checkpoint();
       const file = files.get(meta.docId);
       if (!file || !meta.docModifiedTime || !(file.modifiedTime > meta.docModifiedTime)) continue;
 
@@ -481,9 +492,17 @@ export function createSyncEngine({
 
   let rootPromise = null;
 
-  async function run() {
+  // `signal` and `beat` come from the single-flight watchdog; both are
+  // optional, so the engine runs the same with neither.
+  async function run({ signal = null, beat = null } = {}) {
     summary = { pushed: 0, pulled: 0, readBack: 0, trashed: 0, created: 0, errors: [] };
     pushedThisRun.clear();
+    checkpoint = () => {
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : new StallError('Sync', 0);
+      }
+      if (beat) beat();
+    };
 
     const google = (await store.getSetting('google', {})) || {};
     if (!google.connected) return { ...summary, skipped: 'not-connected' };
@@ -493,15 +512,22 @@ export function createSyncEngine({
     try {
       rootPromise = ensureRoot();
       await rootPromise;
+      checkpoint();
       await pull();
+      checkpoint();
       await readBack();
 
       for (const collection of PUSH_ORDER) {
         for (const record of await store.list(collection, { includeDeleted: true })) {
+          checkpoint();
           try {
             await pushRecord(collection, record);
           } catch (error) {
-            if (error instanceof NeedsReconnectError) throw error;
+            // A stall is the connection's problem, not this record's.
+            // Carrying on would wait out the full timeout once per
+            // record — a project of two hundred would sit "syncing" for
+            // over an hour to learn what the first timeout already said.
+            if (error instanceof NeedsReconnectError || error instanceof StallError) throw error;
             summary.errors.push({ collection, id: record.id, message: error.message });
             await store.setSyncMeta(collection, record.id, {
               ...((await store.getSyncMeta(collection, record.id)) || {}),
@@ -520,9 +546,14 @@ export function createSyncEngine({
       });
     } catch (error) {
       const reconnect = error instanceof NeedsReconnectError;
+      const stalled = error instanceof StallError;
       await store.updateSetting('google', {
         status: reconnect ? 'reconnect' : 'error',
-        lastError: reconnect ? 'Google needs you to reconnect.' : error.message,
+        lastError: reconnect
+          ? 'Google needs you to reconnect.'
+          : stalled
+            ? `${error.message} Nothing was lost — sync picks up where it stopped next time.`
+            : error.message,
       });
       summary.errors.push({ message: error.message, fatal: true });
     }
@@ -531,4 +562,21 @@ export function createSyncEngine({
   }
 
   return { run };
+}
+
+// "syncing" is written to storage at the start of a run and replaced at
+// the end. If the service worker is put to sleep or killed mid-run, the
+// end never comes: storage says "syncing" with nothing syncing, Settings
+// shows "Syncing now…" and its Sync now button stays disabled.
+//
+// Sync only ever runs in the worker, so at worker start-up a stored
+// "syncing" is stale by definition. Returns whether it had to be cleared.
+export async function clearStaleSyncing(store = defaultStore) {
+  const google = (await store.getSetting('google', {})) || {};
+  if (google.status !== 'syncing') return false;
+  await store.updateSetting('google', {
+    status: 'error',
+    lastError: 'The last sync was interrupted before it finished. Nothing was lost — it will run again.',
+  });
+  return true;
 }

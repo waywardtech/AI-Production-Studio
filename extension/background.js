@@ -4,10 +4,11 @@
 // CORE-4 (keeping the record store in step with Google Docs).
 
 import { migrate } from './shared/migrate.js';
-import { get, getSetting, getSyncMeta, list, subscribe } from './shared/store.js';
+import { get, getSetting, getSyncMeta, list, subscribe, updateSetting } from './shared/store.js';
 import { createDrive } from './shared/drive.js';
 import { canBrowse, getAccessToken, invalidateToken } from './shared/google-auth.js';
-import { createSyncEngine } from './shared/sync.js';
+import { clearStaleSyncing, createSyncEngine } from './shared/sync.js';
+import { createSingleFlight } from './shared/watchdog.js';
 import { blobs, isTooLarge, newBlobId } from './shared/blobs.js';
 import { assembleSegments, profileById, segmentText, targetById } from './studio/lib/prompt.js';
 
@@ -16,6 +17,11 @@ const SYNC_EVERY_MINUTES = 5;
 // After an edit, wait this long for more before syncing, so typing a
 // paragraph is one sync, not forty.
 const SYNC_DEBOUNCE_MS = 4000;
+// A sync run is given up on after this long with no progress at all —
+// not after this long in total. It has to exceed the longest single
+// Drive request (a five-minute asset transfer), or a legitimate upload
+// would be mistaken for a stall.
+const SYNC_STALL_MS = 6 * 60 * 1000;
 
 // Installing or updating brings stored data into the current shape
 // straight away, rather than waiting for the first page to open. Every
@@ -62,30 +68,35 @@ async function productionContext(production) {
 // to upload. A machine that doesn't hold them just has nothing to send.
 const engine = createSyncEngine({ drive, productionContext, blobSource: blobs });
 
-let running = null;
-let again = false;
 let timer = null;
 
+// One sync at a time, and never one that holds the lock forever. Before
+// this, a run that stopped moving — a request that never returned, a
+// token renewal that never came back — kept `running` set for the life
+// of the worker, and every later sync was handed the same stuck promise.
+const syncFlight = createSingleFlight(({ signal, beat }) => engine.run({ signal, beat }), {
+  stallMs: SYNC_STALL_MS,
+  what: 'Sync',
+  // The stuck run can't report its own failure, so it is reported here.
+  onStall: async (error) => {
+    console.error('[Edge Studio] Sync stalled:', error.message);
+    await updateSetting('google', {
+      status: 'error',
+      lastError: `${error.message} Nothing was lost — it will run again at the next sync.`,
+    });
+  },
+  // Something asked for another pass every time, five times running.
+  // Stop, and let the usual debounce decide when to look again.
+  onRerunsCapped: () => scheduleSync(),
+});
+
 async function runSync() {
-  if (running) {
-    again = true;
-    return running;
+  try {
+    return await syncFlight.start();
+  } catch (error) {
+    console.error('[Edge Studio] Sync failed:', error);
+    return undefined;
   }
-  running = (async () => {
-    let last;
-    try {
-      do {
-        again = false;
-        last = await engine.run();
-      } while (again);
-    } catch (error) {
-      console.error('[Edge Studio] Sync failed:', error);
-    } finally {
-      running = null;
-    }
-    return last;
-  })();
-  return running;
 }
 
 function scheduleSync(delay = SYNC_DEBOUNCE_MS) {
@@ -99,6 +110,14 @@ function scheduleSync(delay = SYNC_DEBOUNCE_MS) {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) scheduleSync(0);
 });
+
+// A worker killed mid-sync leaves "syncing" in storage with nothing
+// syncing. This is the first thing a fresh worker checks.
+clearStaleSyncing()
+  .then((wasStale) => {
+    if (wasStale) scheduleSync(500);
+  })
+  .catch((error) => console.error('[Edge Studio] Could not check for an interrupted sync:', error));
 
 // Records changed by a page (not by this worker's own sync) are due for
 // upload. Connecting Google starts a first sync straight away.
