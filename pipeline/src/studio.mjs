@@ -179,13 +179,26 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
   async function runRender(job, { signal }) {
     const { recipeId, shotId, parentTakeId, promotedFromTakeId } = job.payload;
     const recipe = store.get('recipes', recipeId);
+
+    // A recipe yields one take, and the take's id is derived from the
+    // recipe. So if this job was interrupted after its take was written
+    // but before the job was marked done, running it again finds the
+    // take already there: no second render is paid for, and the shot
+    // can't end up holding two copies of the same take.
+    const takeId = `take_${recipeId.replace(/^rcp_/, '')}`;
+    if (store.has('takes', takeId)) {
+      const shot = store.get('shots', shotId);
+      if (!shot.headTakeId) store.put('shots', { ...shot, headTakeId: takeId });
+      return { takeId, reused: true };
+    }
+
     const output = await adapters.generate(recipe, { signal });
 
     const blobId = `out_${hashOf(output.content)}`;
     store.insert('blobs', { id: blobId, hash: hashOf(output.content), mime: output.mime, content: output.content, createdAt: now() });
 
     const take = {
-      id: newId('take'), shotId, recipeId, tier: recipe.resolutionTier, blobId, composition: output.composition,
+      id: takeId, shotId, recipeId, tier: recipe.resolutionTier, blobId, composition: output.composition,
       parentTakeId, promotedFromTakeId, jobId: job.id, modelId: recipe.modelId, seed: recipe.seed,
       n: store.list('takes', (t) => t.shotId === shotId).length + 1, createdAt: now(),
     };

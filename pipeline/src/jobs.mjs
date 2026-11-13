@@ -14,6 +14,8 @@
 // States:  queued → running → succeeded
 //                         ↘ failed      (retry / fallback / resume put it back to queued)
 //                         ↘ queued      (transient fault, attempts left)
+//            running ──(process died)──→ queued, via recover() at start-up
+//                                      ↘ failed, after too many interruptions
 
 import { newId } from './ids.mjs';
 import { classifyError } from './adapters.mjs';
@@ -125,5 +127,39 @@ export function createQueue({
     return { requeued: failed.length, alreadyDone: jobs.filter((job) => job.status === 'succeeded').length, total: jobs.length };
   }
 
-  return { enqueue, pump, drain, retry, resumeBatch, byKey, isActive: (id) => active.has(id) };
+  // Called once, at start-up, before anything is pumped.
+  //
+  // A job's status is on disk; the work was in a process that no longer
+  // exists. At start-up nothing is running in this process yet, so every
+  // record that says "running" is an orphan by definition — there is no
+  // heartbeat to consult and no guess to make. Each goes back in line.
+  //
+  // The interruption is not the job's fault, so it does not cost one of
+  // its attempts. But a job that is interrupted again and again is
+  // probably what is bringing the process down, so it gets a limited
+  // number of recoveries and is then stopped for a person to look at.
+  function recover({ maxRecoveries = 3 } = {}) {
+    let requeued = 0;
+    let stopped = 0;
+    store.list('jobs', (job) => job.status === 'running' && !active.has(job.id)).forEach((job) => {
+      const recoveries = (job.recoveries || 0) + 1;
+      if (recoveries > maxRecoveries) {
+        stopped += 1;
+        store.put('jobs', {
+          ...job, status: 'failed', finishedAt: now(),
+          error: {
+            class: 'interrupted', retryable: false, action: 'inspect', attempt: job.attempts, willRetry: false,
+            message: `Interrupted ${recoveries} times in a row.`,
+            advice: 'This job was running each time the studio stopped. It may be the cause — check the shot before retrying.',
+          },
+        });
+        return;
+      }
+      requeued += 1;
+      store.put('jobs', { ...job, status: 'queued', attempts: Math.max(0, job.attempts - 1), runAfter: 0, startedAt: null, recoveries, recoveredAt: now() });
+    });
+    return { requeued, stopped };
+  }
+
+  return { enqueue, pump, drain, retry, resumeBatch, recover, byKey, isActive: (id) => active.has(id) };
 }
