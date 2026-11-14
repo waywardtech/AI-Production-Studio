@@ -94,7 +94,10 @@ function rng(seedText) {
 // the seed, the prompt and the references — never on resolution.
 export function compositionKey(recipe, model) {
   const parts = [recipe.seed, recipe.compiledPrompt, recipe.negativePrompt, recipe.referenceHashes];
-  if (!model.seedLock && !recipe.upscaleGuidance) parts.push(recipe.resolution);
+  // A model with no seed lock lays the shot out differently at every
+  // resolution — unless it is handed the proxy's frames to follow, in
+  // which case it reproduces the layout it drew at proxy size.
+  if (!model.seedLock) parts.push(recipe.upscaleGuidance ? model.tiers.proxy : recipe.resolution);
   return hashOf(parts);
 }
 

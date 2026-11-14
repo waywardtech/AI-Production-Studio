@@ -225,28 +225,76 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     return store.put('shots', { ...shot, approvedTakeId: takeId });
   }
 
+  // What would happen if this take were promoted, worked out before any
+  // money is spent. Blockers stop the promotion; warnings are shown and
+  // can be overridden by promoting anyway.
+  //
+  // Re-running a recipe at a higher resolution only gives the same shot
+  // if the model treats the seed as binding. Where it does not, the
+  // proxy's own frames are passed as guidance; where that is not
+  // possible either, there is nothing to hold the composition, and a
+  // master would be an expensive stranger.
+  function promotionCheck(takeId) {
+    const take = store.get('takes', takeId);
+    if (!take) return { blockers: ['No such take.'], warnings: [], guided: false };
+    const blockers = [];
+    const warnings = [];
+    let guided = false;
+    if (take.tier !== 'proxy') blockers.push('This take is already a master.');
+    else if (masterOf(take)) blockers.push('This take already has a master.');
+    else {
+      const model = modelById(store.get('recipes', take.recipeId).modelId);
+      if (!model.seedLock) {
+        if (model.supportsInitFrame) {
+          guided = true;
+          warnings.push(`${model.label} does not lock its seed across resolutions, so the master will be guided by this proxy's own frames. Compare them before delivery.`);
+        } else {
+          blockers.push(`${model.label} does not lock its seed and cannot be guided by the proxy, so a master would be a different shot. Re-render on a model that can hold the composition.`);
+        }
+      }
+      const reasons = staleReasons(store.get('shots', take.shotId), take);
+      if (reasons.length) {
+        warnings.push(`This take is out of sync with the current story (${reasons.map((r) => r.message).join('; ')}). The master will match the proxy, not the current canon.`);
+      }
+    }
+    return { blockers, warnings, guided };
+  }
+
   // Proxy → master: re-run the take's own locked recipe with only the
-  // resolution changed.
+  // resolution changed (plus, for a model with no seed lock, a pointer
+  // to the proxy it must follow).
   function promote(takeId, { batchId = null } = {}) {
     const take = store.get('takes', takeId);
     if (!take) throw new Error('No such take.');
+    const check = promotionCheck(takeId);
+    if (check.blockers.length) throw Object.assign(new Error(check.blockers[0]), { refusal: true, blockers: check.blockers });
     const proxy = store.get('recipes', take.recipeId);
     const model = modelById(proxy.modelId);
-    const master = promoteRecipe(proxy, model);
+    const master = promoteRecipe(proxy, model, { guidanceTakeId: check.guided ? take.id : null });
     const job = enqueueRecipe(master, { shotId: take.shotId, parentTakeId: take.id, promotedFromTakeId: take.id, batchId });
-    return { job, recipe: master, changed: recipeDelta(proxy, master), warnings: [] };
+    return { job, recipe: master, changed: recipeDelta(proxy, master), warnings: check.warnings };
   }
 
-  // Every approved proxy that has no master yet, as one batch.
+  // Every approved proxy that has no master yet, as one batch. A batch
+  // is not a deliberate decision about any one shot, so anything that
+  // would need one — a stale take, a blocked promotion — is skipped and
+  // reported rather than mastered blindly.
   function promoteApproved({ sceneId = null } = {}) {
     const batch = store.put('batches', { id: newId('bat'), kind: 'promote', createdAt: now() });
     const results = [];
+    const skipped = [];
     store.list('shots', (s) => s.approvedTakeId && (!sceneId || s.sceneId === sceneId)).forEach((shot) => {
       const take = store.get('takes', shot.approvedTakeId);
       if (take.tier !== 'proxy' || masterOf(take)) return;
+      const check = promotionCheck(take.id);
+      const stale = check.warnings.find((w) => /out of sync/.test(w));
+      if (check.blockers.length || stale) {
+        skipped.push({ shotId: shot.id, name: shot.name, reason: check.blockers[0] || stale });
+        return;
+      }
       results.push({ shotId: shot.id, ...promote(take.id, { batchId: batch.id }) });
     });
-    return { batch, results };
+    return { batch, results, skipped };
   }
 
   const masterOf = (take) => store.list('takes', (t) => t.promotedFromTakeId === take.id)[0] || null;
@@ -270,10 +318,10 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
 
   // ---------- staleness ----------
 
-  function staleness(shotId) {
-    const shot = store.get('shots', shotId);
-    const take = currentTake(shot);
-    if (!take) return { state: 'empty', reasons: [] };
+  // Why a given take no longer matches what the shot would compile to
+  // today. Compares what the take's recipe was built from with the
+  // current heads; never modifies anything.
+  function staleReasons(shot, take) {
     const recipe = store.get('recipes', take.recipeId);
     const scene = store.get('scenes', shot.sceneId);
     const world = worldFor(shot, scene);
@@ -290,6 +338,14 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     });
     if (recipe.inputs.sceneRev !== sceneRevision(scene)) reasons.push({ kind: 'scene', message: 'The scene changed' });
     if (recipe.inputs.shotRev !== shotRevision(shot)) reasons.push({ kind: 'shot', message: 'The shot itself was edited' });
+    return reasons;
+  }
+
+  function staleness(shotId) {
+    const shot = store.get('shots', shotId);
+    const take = currentTake(shot);
+    if (!take) return { state: 'empty', reasons: [] };
+    const reasons = staleReasons(shot, take);
 
     const master = take.tier === 'master' ? take : masterOf(take);
     const state = reasons.length ? 'stale' : shot.approvedTakeId ? (master ? 'mastered' : 'approved') : 'draft';
@@ -375,7 +431,7 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     createEntity, reviseEntity, addVaultAsset, head, downstreamShots,
     createScene, updateScene, createShot, updateShot,
     inspect, applyRefine, setLock,
-    render, promote, promoteApproved, branch, approve, rerender, retryWithFallback,
+    render, promote, promotionCheck, promoteApproved, branch, approve, rerender, retryWithFallback,
     takesOf, currentTake, masterOf, staleness, graph, board, exportManifest,
   };
 }

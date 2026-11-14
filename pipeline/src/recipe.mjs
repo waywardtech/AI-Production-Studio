@@ -71,6 +71,13 @@ export function recipeDelta(a, b) {
 // promotion rather than being trusted.
 export function promoteRecipe(proxy, model, { guidanceTakeId = null } = {}) {
   if (proxy.resolutionTier !== 'proxy') throw new Error('Only a proxy recipe can be promoted to master.');
+  // Framing cannot survive a change of shape: a master tier with a
+  // different aspect ratio would have to crop or invent picture.
+  const from = proxy.resolution;
+  const to = model.tiers.master;
+  if (from?.w && from?.h && to.w && to.h && Math.abs(from.w / from.h - to.w / to.h) > 0.01) {
+    throw new Error(`${model.label || model.id} masters at a different aspect ratio (${to.w}×${to.h}) than this proxy (${from.w}×${from.h}); the framing would not survive.`);
+  }
   const { id, ...body } = proxy;
   const master = seal({
     ...structuredClone(body),

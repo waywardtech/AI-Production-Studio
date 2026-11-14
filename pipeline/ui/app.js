@@ -256,7 +256,11 @@ function renderHeader() {
   $('rerender-stale').onclick = act(async () => { await api('rerender', { shotIds: stale.map((s) => s.id) }); toast(`Queued ${stale.length} proxy re-render${stale.length === 1 ? '' : 's'}. Approved takes stay approved until you approve a replacement.`); });
   $('promote-approved').hidden = promotable.length === 0;
   $('promote-approved').textContent = `Promote ${promotable.length} approved to master`;
-  $('promote-approved').onclick = act(() => api('promote-approved', {}));
+  $('promote-approved').onclick = act(async () => {
+    const r = await api('promote-approved', {});
+    const skipped = r.skipped || [];
+    toast(`Promoting ${r.results.length} to master.${skipped.length ? ` Skipped ${skipped.length}: ${skipped.map((s) => `${s.name} — ${s.reason}`).join(' ')}` : ''}`);
+  });
   const d = ui.state.delivery;
   $('delivery').textContent = `${d.rows.filter((r) => r.state === 'mastered').length}/${d.rows.length} shots mastered · ${d.totalS}s`;
   $('chaos').value = ui.state.chaos;
