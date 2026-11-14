@@ -89,7 +89,7 @@ function renderBoard() {
       const shown = shot.master || shot.take;
       const card = el('div', { className: `shot is-${shot.status.state}${ui.shotId === shot.id ? ' selected' : ''}` },
         el('div', { className: 'thumb' }, shown ? el('img', { src: blobUrl(shown.blobId), alt: shot.name }) : 'no take yet'),
-        el('div', { className: 'name' }, el('span', { textContent: shot.name }), el('span', { className: `badge state-${shot.status.state}`, textContent: shot.status.state === 'stale' ? 'out of sync' : shot.status.state })),
+        el('div', { className: 'name' }, el('span', { textContent: shot.name }), el('span', { className: `badge state-${shot.status.state}`, textContent: shot.status.state === 'stale' ? 'out of sync' : shot.status.state === 'review' ? 'new take to review' : shot.status.state })),
         el('div', { className: 'sub', textContent: `${shot.kind} · ${shot.durationS}s · ${shot.takeCount} take${shot.takeCount === 1 ? '' : 's'}${shown ? ` · ${shown.tier}` : ''}` }),
         shot.status.reasons.length ? el('div', { className: 'ripple', textContent: `↯ ${shot.status.reasons.map((r) => r.message).join('; ')}` }) : null);
       card.style.setProperty('--dur', shot.durationS);
@@ -119,7 +119,7 @@ function renderGraph() {
   });
   nodes.forEach((n) => {
     const g = s('g', { class: `node ${n.type} ${n.state || ''}`, transform: `translate(${pos[n.id].x},${pos[n.id].y})` });
-    g.append(s('rect', { width: W, height: H }), s('text', { x: 10, y: 21 }, `${n.label}${n.type === 'bible' ? `  · v${n.version}` : n.state === 'stale' ? '  ↯' : ''}`));
+    g.append(s('rect', { width: W, height: H }), s('text', { x: 10, y: 21 }, `${n.label}${n.type === 'bible' ? `  · v${n.version}` : n.state === 'stale' ? '  ↯' : n.state === 'review' ? '  ?' : ''}`));
     if (n.type === 'shot') g.onclick = () => selectShot(n.id);
     svg.append(g);
   });
@@ -185,14 +185,14 @@ function renderInspector() {
   }
 
   root.append(el('h3', { textContent: `Takes (${d.takes.length})` }));
-  [...d.takes].reverse().filter((t) => !t.promotedFromTakeId).forEach((take) => root.append(takeCard(take, shot)));
+  [...d.takes].reverse().filter((t) => !t.promotedFromTakeId).forEach((take) => root.append(takeCard(take, shot, d.status)));
   $('inspector').replaceChildren(root);
 }
 
-function takeCard(take, shot) {
+function takeCard(take, shot, status) {
   const approved = shot.approvedTakeId === take.id;
   const card = el('div', { className: `take${approved ? ' approved' : ''}` },
-    el('div', { className: 'head' }, el('span', { textContent: `Take ${take.n} · seed ${take.seed} · ${take.modelId}${take.parentTakeId ? ' · branched' : ''}` }), el('span', { textContent: approved ? 'approved' : '' })));
+    el('div', { className: 'head' }, el('span', { textContent: `Take ${take.n} · seed ${take.seed} · ${take.modelId}${take.parentTakeId ? ' · branched' : ''}` }), el('span', { textContent: approved ? (status?.state === 'review' || status?.state === 'stale' ? 'approved · out of date' : 'approved') : status?.candidateTakeId === take.id ? 'matches current canon — approve to replace' : '' })));
 
   if (take.master) {
     // Proxy underneath, master on top, clipped at the slider.

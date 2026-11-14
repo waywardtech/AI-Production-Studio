@@ -62,6 +62,8 @@ docs/
   tickets-phase-0-2.md                          tickets for Core, Module 1 and Module 2
   tickets-phase-4.md                            tickets for Module 4
   tickets-phase-5.md                            tickets for media files and attachments
+pipeline/      the Production Studio web app — `npm run studio`, then http://localhost:4173
+PIPELINE_ARCHITECTURE.md   its asset model, proxy-to-master rules and job recovery
 HARNESS_CHANGELOG.md   what stops it waiting forever: the timeout and watchdog rules
 tests/         `npm test` (Node, no dependencies)
                `npm run test:browser` (the extension loaded into a real Chrome)
@@ -79,6 +81,7 @@ tests/         `npm test` (Node, no dependencies)
 | **Module 3** — visual reference pipeline | Spec'd, not ticketed |
 | **Module 4** — production pipeline: scenes, assets, shot builder, Produce, review, dailies | Built; P1 extras open |
 | **Files** — import media, scripts and documents from your disk or your Drive; keep them; send them to a chat with the prompt | Built; the attach selectors are unverified on the live sites — **Check page** in the side panel reports what each one would find |
+| **Production Studio** (`pipeline/`) — Story Bible, versioned takes, prompt compiler, proxy → master, job recovery, storyboard and graph | Built and tested against mock models; no real model service connected |
 
 Ticket-by-ticket detail is in the extension README's reference section and
 in `docs/`.

@@ -348,8 +348,16 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     const reasons = staleReasons(shot, take);
 
     const master = take.tier === 'master' ? take : masterOf(take);
+    // An approved take that has gone stale stays approved until a person
+    // approves its replacement. If a take compiled from today's canon
+    // already exists, the shot is not waiting on a render any more — it
+    // is waiting on that decision, and says which take to look at.
+    if (reasons.length && shot.approvedTakeId) {
+      const candidate = takesOf(shotId).filter((t) => t.id !== take.id && t.tier === 'proxy' && !staleReasons(shot, t).length).pop();
+      if (candidate) return { state: 'review', reasons, takeId: take.id, candidateTakeId: candidate.id, hasMaster: !!master };
+    }
     const state = reasons.length ? 'stale' : shot.approvedTakeId ? (master ? 'mastered' : 'approved') : 'draft';
-    return { state, reasons, takeId: take.id, hasMaster: !!master };
+    return { state, reasons, takeId: take.id, candidateTakeId: null, hasMaster: !!master };
   }
 
   // Re-render exactly the shots asked for — normally the stale ones —
@@ -360,6 +368,7 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     const results = shotIds.map((shotId) => {
       const shot = store.get('shots', shotId);
       const take = currentTake(shot);
+      if (staleness(shotId).state === 'review') return { shotId, skipped: 'A fresh take is already waiting for review.' };
       try {
         return { shotId, ...render(shotId, { seed: take?.seed ?? null, parentTakeId: take?.id || null, batchId: batch.id }) };
       } catch (error) {

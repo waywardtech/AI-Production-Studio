@@ -43,8 +43,8 @@ footer { border-top: 1px solid var(--line); background: var(--panel); }
 .shot .sub { font-size: 11px; color: var(--dim); }
 .badge { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 9px; border: 1px solid currentColor; white-space: nowrap; }
 .state-empty { color: var(--dim); } .state-draft { color: var(--accent); } .state-approved { color: var(--ok); } .state-mastered { color: var(--master); }
-.state-stale { color: var(--warn); }
-.shot.is-stale { border-color: var(--warn); border-style: dashed; }
+.state-stale, .state-review { color: var(--warn); }
+.shot.is-stale { border-color: var(--warn); border-style: dashed; } .shot.is-review { border-color: var(--warn); }
 .shot.is-mastered { border-color: var(--master); } .shot.is-approved { border-color: var(--ok); }
 .ripple { font-size: 11px; color: var(--warn); margin-top: 3px; }
 /* The ripple: shots downstream of the Bible entry being hovered or edited */
@@ -54,6 +54,7 @@ footer { border-top: 1px solid var(--line); background: var(--panel); }
 #graph svg { width: 100%; min-height: 420px; }
 #graph .node rect { fill: var(--raised); stroke: var(--line); rx: 6; } #graph .node text { fill: var(--text); font-size: 11px; }
 #graph .node.shot { cursor: pointer; } #graph .node.stale rect { stroke: var(--warn); stroke-dasharray: 4 3; }
+#graph .node.review rect { stroke: var(--warn); }
 #graph .node.approved rect { stroke: var(--ok); } #graph .node.mastered rect { stroke: var(--master); } #graph .node.draft rect { stroke: var(--accent); }
 #graph .edge { stroke: var(--line); fill: none; stroke-width: 1.2; } #graph .edge.stale { stroke: var(--warn); stroke-width: 2; stroke-dasharray: 5 3; }
 #graph .col { fill: var(--dim); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
