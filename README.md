@@ -81,7 +81,7 @@ tests/         `npm test` (Node, no dependencies)
 | **Module 3** — visual reference pipeline | Spec'd, not ticketed |
 | **Module 4** — production pipeline: scenes, assets, shot builder, Produce, review, dailies | Built; P1 extras open |
 | **Files** — import media, scripts and documents from your disk or your Drive; keep them; send them to a chat with the prompt | Built; the attach selectors are unverified on the live sites — **Check page** in the side panel reports what each one would find |
-| **Production Studio** (`pipeline/`) — Story Bible, versioned takes, prompt compiler, proxy → master, job recovery, storyboard and graph | Built and tested against mock models; no real model service connected |
+| **Production Studio** (`pipeline/`) — Story Bible, versioned takes, prompt compiler, proxy → master, job recovery, storyboard and graph | Built. Calls no AI service: takes are made by hand through your ChatGPT or Gemini subscription and imported, or by built-in mocks. Not yet run with real output from those platforms |
 
 Ticket-by-ticket detail is in the extension README's reference section and
 in `docs/`.

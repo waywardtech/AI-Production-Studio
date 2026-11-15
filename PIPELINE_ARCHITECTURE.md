@@ -9,13 +9,19 @@ It has no dependencies. The server is `node:http`, the store is one JSON
 file, the UI is plain HTML, CSS and JavaScript.
 
 **What is real and what is not.** The data model, compiler, consistency
-checks, job queue and UI are real and tested. The models are not: the
-adapters in `src/adapters.mjs` are mocks that draw a deterministic SVG
-from a recipe. They reproduce the properties that matter for the pipeline
-(seed lock or its absence, tiers, latency, the failure classes), so the
-rules below are exercised, but no real image or video service has been
-called. Voice and lip-sync models are declared but no UI stage uses them
-yet.
+checks, job queue and UI are real and tested. The studio calls no AI
+service. A generator is one of two things:
+
+- a **hand-off** to a chat subscription (ChatGPT, Gemini, Sora, Flow):
+  the studio writes the prompt and the attachment list, a person sends
+  it and imports the result (section 4);
+- a **built-in mock** that draws a deterministic SVG from a recipe. The
+  mocks reproduce the properties that matter (seed lock or its absence,
+  tiers, latency, the failure classes) so the rules below can be tested.
+
+No API adapter exists yet. The hand-off path has been run end to end in a
+browser with stand-in files, not with real output from those platforms.
+Voice and lip-sync models are declared but no UI stage uses them.
 
 ## 1. Assets
 
@@ -148,7 +154,50 @@ Promotion re-runs a proxy take's own recipe at master resolution.
 - **Every write to the store is atomic** (temp file, then rename), so a
   crash leaves the previous state, never half of one.
 
-## 4. The five pillars, and where they live
+## 4. Generators, routing and hand-off
+
+**Routing.** Which generator a shot goes to is decided in this order: a
+choice made for that render, the look's preference, the project default,
+the built-in mock. Stills and video are routed separately. A preference
+is stored on the look's pointer record, not in a version, so changing it
+creates no new canon and marks nothing out of sync.
+
+**Hand-off.** Rendering on a hand-off generator creates a job in the
+`waiting` state. It is never pumped, never times out and is untouched by
+restart recovery, because the work is a person's.
+
+```
+render ──→ waiting ──deliver(file)──→ succeeded   (an ordinary take, marked imported)
+              ├──── "it refused" ───→ failed: content_filter ──Retry──→ waiting
+              └──── withdraw ───────→ cancelled
+```
+
+The sheet for a waiting job gives the platform to open, the vault
+references to attach, and the message to paste (the compiled prompt, word
+for word). For a master it also attaches the proxy as the composition to
+follow. The studio sends nothing.
+
+Delivery refuses an empty file, the wrong kind of file, a job that is not
+waiting, and a file that is already another take. Imported files are
+stored on disk by content hash (`pipeline/.data/files/`), outside the
+JSON store.
+
+None of the hand-off generators locks a seed, so every promotion is
+guided by its proxy (section 2). The studio cannot measure drift on a
+file made elsewhere: an imported take has no `composition` key and the UI
+says to check the wipe by eye.
+
+**Bake-off.** "Compare generators" sends the same shot and seed to each
+hand-off generator of that kind as one batch. The takes sit side by side;
+"Use … from now on" makes the winner the look's generator. Nothing is
+approved automatically.
+
+**Adding an API later.** Add a model declaration without
+`mode: 'handoff'` and implement `generate(recipe)` for it in
+`src/adapters.mjs`. Routing, recipes, takes, promotion and the queue do
+not change.
+
+## 5. The five pillars, and where they live
 
 | Pillar | Code | What the creator sees |
 |---|---|---|
@@ -158,9 +207,9 @@ Promotion re-runs a proxy take's own recipe at master resolution.
 | Job recovery | `src/jobs.mjs` | Jobs panel with the error class and advice, Retry, Retry with fallback model, Resume failed batch, Branch from any take. |
 | UI | `ui/` | Storyboard sized by shot duration, dependency graph with stale edges, ripple reasons on each card, "Re-render N out-of-sync" for only the affected shots. |
 
-## 5. Verification
+## 6. Verification
 
-`npm run test:pipeline` — four files, no network, mocked slow and failing
+`npm run test:pipeline` — five files, no network, mocked slow and failing
 models.
 
 | File | Checks | Covers |
@@ -168,14 +217,17 @@ models.
 | `core.test.mjs` | 61 | Store immutability, compiler, critic, consistency, recipes, promotion on a seed-locked model, queue retries, fallback, batch resume. |
 | `recovery.test.mjs` | 20 | Cycle 1 — a restart mid-render: orphaned jobs resume, completed shots are not rendered twice, a crash-looping job stops. |
 | `promotion.test.mjs` | 19 | Cycle 2 — models without seed lock, guided and refused promotions, stale takes, double promotion, aspect ratio. |
+| `handoff.test.mjs` | 41 | Hand-off jobs wait and survive restarts, the sheet, delivery and its refusals, routing precedence, bake-off, promoting an imported proxy. |
 | `canon.test.mjs` | 21 | Cycle 3 — a Story Bible edit under approved work: dependents marked, approvals and takes untouched, re-render leads to `review` and stops repeating. |
 
 Each hardening test was written first and seen to fail, then seen to
 fail again with its fix removed.
 
-## 6. Known limits
+## 7. Known limits
 
-- Mock models only (see the top of this file).
+- No real model has produced a take here yet (see the top of this file).
+- Tier sizes for hand-off generators are what is asked for; the platform
+  decides what it returns, and the studio does not check dimensions.
 - One process, one JSON file: single user, and a large film would want a
   real database and blob storage.
 - No audio, edit or grade stage in the UI; delivery is a manifest of

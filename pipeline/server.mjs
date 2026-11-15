@@ -3,11 +3,14 @@
 //   node pipeline/server.mjs          → http://localhost:4173
 //
 // node:http and nothing else. State lives in pipeline/.data/studio.json.
-// The media models are the mock adapters (src/adapters.mjs); PORT and
-// LATENCY_MS are the only knobs.
+// Imported media lives beside it in pipeline/.data/files/.
+//
+// Nothing here calls an AI service. Generators are either the built-in
+// mocks or hand-offs to a chat subscription (src/handoff.mjs), where a
+// person sends the prompt and imports the result.
 
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore } from './src/store.mjs';
@@ -29,8 +32,19 @@ const faults = (recipe, attempt) => {
   if (chaos === 'video-down' && recipe.modelId === 'motion-v2') throw new ModelError('timeout', 'Simulated: motion-v2 is not answering.');
 };
 
+// Imported files are named by content hash, so writing one twice is
+// harmless and none is ever changed.
+const FILES = join(DATA, '..', 'files');
+mkdirSync(FILES, { recursive: true });
+const filePath = (id) => join(FILES, id.replace(/[^a-zA-Z0-9_]/g, ''));
+const files = {
+  put: (id, bytes) => { if (!existsSync(filePath(id))) writeFileSync(filePath(id), bytes); },
+  get: (id) => (existsSync(filePath(id)) ? readFileSync(filePath(id)) : null),
+};
+const MAX_UPLOAD = 1024 * 1024 * 1024;
+
 const store = createStore({ file: DATA });
-const studio = createStudio({ store, adapters: createAdapters({ faults, latencyMs: Number(process.env.LATENCY_MS || 700) }), queueOptions: { backoffMs: (n) => 400 * n } });
+const studio = createStudio({ store, files, adapters: createAdapters({ faults, latencyMs: Number(process.env.LATENCY_MS || 700) }), queueOptions: { backoffMs: (n) => 400 * n } });
 if (store.list('shots').length === 0) seedDemo(studio);
 
 // Anything left "running" by a previous process is dealt with before the
@@ -47,7 +61,8 @@ const shotDetail = (id) => {
 
 const routes = [
   ['GET', /^\/api\/state$/, () => ({
-    board: studio.board(), graph: studio.graph(), models: studio.models, chaos,
+    board: studio.board(), graph: studio.graph(), models: studio.models, chaos, routing: studio.routing(),
+    handoffs: store.list('jobs', (job) => job.byHand && job.status === 'waiting').sort((a, b) => a.createdAt - b.createdAt).map((job) => ({ ...studio.handoffSheet(job.id), createdAt: job.createdAt })),
     bible: store.list('bible').map((entity) => ({ ...entity, version: store.get('bibleVersions', entity.headVersionId), downstream: studio.downstreamShots(entity.id).length })),
     jobs: store.list('jobs').sort((a, b) => b.createdAt - a.createdAt).slice(0, 30),
     delivery: studio.exportManifest(),
@@ -66,6 +81,11 @@ const routes = [
   ['POST', /^\/api\/jobs\/([^/]+)\/retry$/, (m) => studio.queue.retry(m[1])],
   ['POST', /^\/api\/jobs\/([^/]+)\/fallback$/, (m) => studio.retryWithFallback(m[1])],
   ['POST', /^\/api\/batches\/([^/]+)\/resume$/, (m) => studio.queue.resumeBatch(m[1])],
+  ['POST', /^\/api\/shots\/([^/]+)\/bakeoff$/, (m, body) => studio.bakeoff(m[1], body)],
+  ['POST', /^\/api\/takes\/([^/]+)\/prefer$/, (m) => studio.preferGeneratorOf(m[1])],
+  ['POST', /^\/api\/routing$/, (m, body) => studio.setRouting(body)],
+  ['POST', /^\/api\/jobs\/([^/]+)\/refused$/, (m, body) => studio.reportRefusal(m[1], body.message)],
+  ['POST', /^\/api\/jobs\/([^/]+)\/cancel$/, (m) => studio.cancelHandoff(m[1])],
   ['POST', /^\/api\/chaos$/, (m, body) => ({ chaos: (chaos = body.mode) })],
 ];
 
@@ -76,10 +96,34 @@ createServer(async (req, res) => {
   try {
     const blob = url.pathname.match(/^\/api\/blob\/([^/]+)$/);
     if (blob) {
-      const record = store.get('blobs', blob[1]);
-      if (!record) return res.writeHead(404).end();
+      const found = studio.readBlob(blob[1]);
+      if (!found?.bytes) return res.writeHead(404).end();
       // Outputs are addressed by content hash, so they never change.
-      return res.writeHead(200, { 'Content-Type': record.mime, 'Cache-Control': 'public, max-age=31536000, immutable' }).end(record.content);
+      const headers = { 'Content-Type': found.mime, 'Cache-Control': 'public, max-age=31536000, immutable', 'Accept-Ranges': 'bytes' };
+      if (url.searchParams.has('download')) headers['Content-Disposition'] = `attachment; filename="${(url.searchParams.get('download') || blob[1]).replace(/[^\w .-]/g, '_')}"`;
+      // Video players ask for byte ranges.
+      const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (range && (range[1] || range[2])) {
+        const size = found.bytes.length;
+        const start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+        const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+        if (start > end || start >= size) return res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end();
+        return res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 }).end(found.bytes.subarray(start, end + 1));
+      }
+      return res.writeHead(200, { ...headers, 'Content-Length': found.bytes.length }).end(found.bytes);
+    }
+    // The result of a hand-off: the file itself as the request body.
+    const delivery = req.method === 'POST' && url.pathname.match(/^\/api\/jobs\/([^/]+)\/deliver$/);
+    if (delivery) {
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > MAX_UPLOAD) throw Object.assign(new Error('That file is larger than 1 GB.'), { refusal: true });
+        chunks.push(chunk);
+      }
+      const result = studio.deliver(delivery[1], { bytes: Buffer.concat(chunks), mime: req.headers['content-type'] || '', filename: url.searchParams.get('name') });
+      return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(result));
     }
     for (const [method, pattern, handler] of routes) {
       const match = req.method === method && url.pathname.match(pattern);

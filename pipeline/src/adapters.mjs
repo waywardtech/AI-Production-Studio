@@ -48,6 +48,38 @@ export const MODELS = [
     seedLock: true, promptStyle: 'prose', maxPromptTokens: 200, supportsNegative: false, fallback: null },
   { id: 'lipsync-v1', kind: 'lipsync', label: 'Lip-sync v1', tiers: { proxy: { w: 854, h: 480 }, master: { w: 1920, h: 1080 } },
     seedLock: true, promptStyle: 'prose', maxPromptTokens: 60, supportsNegative: false, fallback: null },
+
+  // ---- Hand-off generators: your chat subscriptions, used by hand ----
+  //
+  // No API and no per-render charge. The studio writes the prompt and
+  // the list of attachments; you send it and import what comes back
+  // (src/handoff.mjs). None of these honours a seed, so a master is
+  // always guided by its proxy. The tier sizes are what gets asked for;
+  // the platform decides what it actually returns.
+  {
+    id: 'chatgpt-image', kind: 'image', mode: 'handoff', provider: 'chatgpt', cost: 'subscription',
+    label: 'ChatGPT (stills, by hand)', url: 'https://chatgpt.com/',
+    tiers: { proxy: { w: 1024, h: 576 }, master: { w: 2048, h: 1152 } },
+    seedLock: false, supportsInitFrame: true, promptStyle: 'prose', maxPromptTokens: 400, supportsNegative: false, fallback: null,
+  },
+  {
+    id: 'gemini-image', kind: 'image', mode: 'handoff', provider: 'gemini', cost: 'subscription',
+    label: 'Gemini (stills, by hand)', url: 'https://gemini.google.com/app',
+    tiers: { proxy: { w: 1024, h: 576 }, master: { w: 2048, h: 1152 } },
+    seedLock: false, supportsInitFrame: true, promptStyle: 'prose', maxPromptTokens: 400, supportsNegative: false, fallback: null,
+  },
+  {
+    id: 'chatgpt-video', kind: 'video', mode: 'handoff', provider: 'chatgpt', cost: 'subscription',
+    label: 'Sora (video, by hand)', url: 'https://sora.chatgpt.com/',
+    tiers: { proxy: { w: 854, h: 480 }, master: { w: 1920, h: 1080 } },
+    seedLock: false, supportsInitFrame: true, promptStyle: 'prose', maxPromptTokens: 400, supportsNegative: false, fallback: null,
+  },
+  {
+    id: 'gemini-video', kind: 'video', mode: 'handoff', provider: 'gemini', cost: 'subscription',
+    label: 'Gemini / Flow (video, by hand)', url: 'https://labs.google/fx/tools/flow',
+    tiers: { proxy: { w: 854, h: 480 }, master: { w: 1920, h: 1080 } },
+    seedLock: false, supportsInitFrame: true, promptStyle: 'prose', maxPromptTokens: 400, supportsNegative: false, fallback: null,
+  },
 ];
 
 export const modelById = (id) => MODELS.find((model) => model.id === id) || null;
@@ -131,6 +163,10 @@ export function createAdapters({ faults = null, latencyMs = 0, sleep = (ms) => n
     async generate(recipe, { signal } = {}) {
       const model = modelById(recipe.modelId);
       if (!model) throw new ModelError('malformed_prompt', `Unknown model "${recipe.modelId}"`);
+      // A hand-off generator is a person with a subscription. If one ever
+      // reaches this point it is a bug upstream, and drawing a mock in
+      // its place would pass off a placeholder as their work.
+      if (model.mode === 'handoff') throw new ModelError('malformed_prompt', `${model.label} is done by hand and cannot be called.`);
       const attempt = (attempts.get(recipe.id) || 0) + 1;
       attempts.set(recipe.id, attempt);
 

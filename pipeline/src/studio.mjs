@@ -21,13 +21,24 @@ import { createStore } from './store.mjs';
 import { createAdapters, defaultModelFor, modelById, MODELS } from './adapters.mjs';
 import { compileShot, critique, diffClauses, refine } from './compiler.mjs';
 import { checkContinuity, resolveReferences } from './consistency.mjs';
+import { createHash } from 'node:crypto';
+import { buildHandoffSheet } from './handoff.mjs';
 import { buildRecipe, promoteRecipe, recipeDelta, sceneRevision, shotRevision } from './recipe.mjs';
 import { createQueue } from './jobs.mjs';
 
 export const BIBLE_KINDS = ['character', 'location', 'prop', 'look', 'format', 'voice'];
 const KIND_MODEL = { frame: 'image', video: 'video', voice: 'voice' };
 
-export function createStudio({ store = createStore(), adapters = createAdapters(), queueOptions = {}, now = () => Date.now(), randomSeed = () => Math.floor(Math.random() * 1e9) } = {}) {
+// `files` holds imported media (which can be large) outside the JSON
+// store: { put(id, bytes), get(id) }. In memory unless the server says
+// otherwise.
+function memoryFiles() {
+  const map = new Map();
+  return { put: (id, bytes) => void map.set(id, Buffer.from(bytes)), get: (id) => map.get(id) || null };
+}
+const refuse = (message) => Object.assign(new Error(message), { refusal: true });
+
+export function createStudio({ store = createStore(), adapters = createAdapters(), files = memoryFiles(), queueOptions = {}, now = () => Date.now(), randomSeed = () => Math.floor(Math.random() * 1e9) } = {}) {
   // ---------- Story Bible ----------
 
   function createEntity({ kind, name, fields = {}, referenceAssetIds = [] }) {
@@ -117,6 +128,38 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
       entity.kind === 'look' || entity.kind === 'format' || shot.characterIds.includes(entityId) || shot.propIds.includes(entityId) || sceneIds.has(shot.sceneId));
   }
 
+  // ---------- routing ----------
+  //
+  // Which generator a shot goes to: an explicit choice for this render,
+  // else the look's preference, else the project's, else the built-in
+  // default. A preference lives on the look's pointer record, not in a
+  // version: choosing a generator is a production decision, not a change
+  // of canon, and must not mark anything out of sync.
+
+  const projectRouting = () => store.get('project', 'routing') || { id: 'routing' };
+  function routeFor(shot, world, explicitId = null) {
+    const kind = KIND_MODEL[shot.kind];
+    const fits = (id) => { const m = modelById(id); return m && m.kind === kind ? m : null; };
+    const explicit = fits(explicitId || shot.modelId);
+    if (explicit) return { model: explicit, routedBy: 'shot' };
+    const look = fits(world.look?.entity.routing?.[kind]);
+    if (look) return { model: look, routedBy: 'look' };
+    const project = fits(projectRouting()[kind]);
+    if (project) return { model: project, routedBy: 'project' };
+    return { model: defaultModelFor(kind), routedBy: 'default' };
+  }
+  function setRouting({ entityId = null, kind, modelId = null }) {
+    if (!['image', 'video'].includes(kind)) throw refuse('Routing is set for stills (image) or video.');
+    const model = modelId ? modelById(modelId) : null;
+    if (modelId && !model) throw refuse(`Unknown generator "${modelId}".`);
+    if (model && model.kind !== kind) throw refuse(`${model.label} makes ${model.kind}, not ${kind}.`);
+    if (!entityId) return store.put('project', { ...projectRouting(), [kind]: modelId });
+    const entity = store.get('bible', entityId);
+    if (!entity || entity.kind !== 'look') throw refuse('Only a look carries a generator preference.');
+    return store.put('bible', { ...entity, routing: { ...(entity.routing || {}), [kind]: modelId } });
+  }
+  const routing = () => ({ image: projectRouting().image || null, video: projectRouting().video || null });
+
   // ---------- compile ----------
 
   // Everything the inspector shows, and everything a render is gated on.
@@ -124,8 +167,8 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     const shot = store.get('shots', shotId);
     if (!shot) throw new Error('No such shot.');
     const scene = store.get('scenes', shot.sceneId);
-    const model = modelById(modelId || shot.modelId) || defaultModelFor(KIND_MODEL[shot.kind]);
     const world = worldFor(shot, scene);
+    const { model, routedBy } = routeFor(shot, world, modelId);
     const compiled = compileShot({ shot, scene, world, model });
     const references = resolveReferences({ world, blobs: (id) => store.get('blobs', id) });
     const issues = critique({ compiled, shot, scene, world });
@@ -135,7 +178,7 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     const reference = currentTake(shot);
     const previous = reference ? store.get('recipes', reference.recipeId) : null;
     return {
-      shot, scene, world, model, compiled, references, issues, continuity, blockers,
+      shot, scene, world, model, routedBy, compiled, references, issues, continuity, blockers,
       diff: previous ? diffClauses(previous.clauses, compiled.clauses) : [],
     };
   }
@@ -159,10 +202,13 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
 
   function enqueueRecipe(recipe, { shotId, parentTakeId = null, promotedFromTakeId = null, batchId = null, fallbackOf = null }) {
     store.insert('recipes', recipe);
+    const byHand = modelById(recipe.modelId)?.mode === 'handoff';
     return queue.enqueue({
       key: `render:${recipe.id}`, kind: 'render', batchId, fallbackOf,
+      // A hand-off never enters the pump: it waits for its delivery.
+      ...(byHand ? { status: 'waiting', byHand: true } : {}),
       payload: { recipeId: recipe.id, shotId, parentTakeId, promotedFromTakeId },
-      label: `${store.get('shots', shotId).name} · ${recipe.resolutionTier}`,
+      label: `${store.get('shots', shotId).name} · ${recipe.resolutionTier}${byHand ? ` · ${modelById(recipe.modelId).label.split(' (')[0]}` : ''}`,
     });
   }
 
@@ -196,16 +242,101 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
 
     const blobId = `out_${hashOf(output.content)}`;
     store.insert('blobs', { id: blobId, hash: hashOf(output.content), mime: output.mime, content: output.content, createdAt: now() });
+    return { takeId: recordTake(job, recipe, { blobId, mime: output.mime, composition: output.composition }).id };
+  }
 
+  function recordTake(job, recipe, { blobId, mime, composition, ...extra }) {
+    const { shotId, parentTakeId, promotedFromTakeId } = job.payload;
     const take = {
-      id: takeId, shotId, recipeId, tier: recipe.resolutionTier, blobId, composition: output.composition,
+      id: `take_${recipe.id.replace(/^rcp_/, '')}`, shotId, recipeId: recipe.id, tier: recipe.resolutionTier, blobId, mime, composition,
       parentTakeId, promotedFromTakeId, jobId: job.id, modelId: recipe.modelId, seed: recipe.seed,
-      n: store.list('takes', (t) => t.shotId === shotId).length + 1, createdAt: now(),
+      n: store.list('takes', (t) => t.shotId === shotId).length + 1, createdAt: now(), ...extra,
     };
     store.insert('takes', take);
+    store.put('shots', { ...store.get('shots', shotId), headTakeId: take.id });
+    return take;
+  }
+
+  // ---------- hand-off ----------
+
+  function handoffJob(jobId) {
+    const job = store.get('jobs', jobId);
+    if (!job || !job.byHand) throw refuse('That is not a hand-off job.');
+    return job;
+  }
+  function handoffSheet(jobId) {
+    const job = handoffJob(jobId);
+    const recipe = store.get('recipes', job.payload.recipeId);
+    const shot = store.get('shots', job.payload.shotId);
+    const references = recipe.referenceAssetIds.map((assetId) => {
+      const blob = store.get('blobs', assetId);
+      return { assetId, missing: !blob, label: blob?.label, from: blob?.label || 'Vault', role: 'reference' };
+    });
+    const guidance = recipe.upscaleGuidance ? store.get('takes', recipe.upscaleGuidance.fromTakeId) : null;
+    return { jobId, shotId: shot.id, shotName: shot.name, ...buildHandoffSheet({ recipe, model: modelById(recipe.modelId), shot, references, guidance }) };
+  }
+
+  // The result of a hand-off, brought back. From here on it is a take
+  // like any other.
+  function deliver(jobId, { bytes, mime = '', filename = null }) {
+    const job = handoffJob(jobId);
+    if (job.status !== 'waiting') throw refuse(`This hand-off is ${job.status}; it is not waiting for a file.`);
+    const recipe = store.get('recipes', job.payload.recipeId);
+    const model = modelById(recipe.modelId);
+    // Interrupted between writing the take and closing the job: the take
+    // is there, so close the job rather than make a second one.
+    const existing = store.get('takes', `take_${recipe.id.replace(/^rcp_/, '')}`);
+    if (existing) { queue.complete(jobId, { takeId: existing.id }); return { take: existing, job: store.get('jobs', jobId) }; }
+    if (!bytes || bytes.length === 0) throw refuse('That file is empty.');
+    if (!mime.startsWith(`${model.kind}/`)) throw refuse(`${store.get('shots', job.payload.shotId).name} needs ${model.kind === 'image' ? 'an image' : 'a video'} file; that was ${mime || 'an unknown type'}.`);
+
+    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);
+    const blobId = `out_${hash}`;
+    // The same file for two different takes is almost always the wrong
+    // file picked in the dialog — and in a bake-off it would make two
+    // generators look identical.
+    const twin = store.list('takes', (t) => t.blobId === blobId)[0];
+    if (twin) throw refuse(`That exact file is already take ${twin.n} of ${store.get('shots', twin.shotId).name}. Pick the file this hand-off produced.`);
+
+    files.put(blobId, bytes);
+    store.insert('blobs', { id: blobId, hash, mime, bytes: bytes.length, external: true, filename, createdAt: now() });
+    const take = recordTake(job, recipe, { blobId, mime, composition: null, imported: true });
+    queue.complete(jobId, { takeId: take.id });
+    return { take, job: store.get('jobs', jobId) };
+  }
+  const reportRefusal = (jobId, message = '') => queue.fail(handoffJob(jobId).id, { kind: 'content_filter', message: message || 'The platform refused this prompt.' });
+  const cancelHandoff = (jobId) => queue.cancel(handoffJob(jobId).id);
+
+  function readBlob(blobId) {
+    const blob = store.get('blobs', blobId);
+    if (!blob) return null;
+    return { mime: blob.mime, filename: blob.filename || blob.label || null, bytes: blob.external ? files.get(blobId) : Buffer.from(blob.content) };
+  }
+
+  // The same shot and seed to several generators, to be judged side by
+  // side. Nothing is approved and no preference changes until asked.
+  function bakeoff(shotId, { modelIds = [], seed = null } = {}) {
     const shot = store.get('shots', shotId);
-    store.put('shots', { ...shot, headTakeId: take.id });
-    return { takeId: take.id };
+    if (!shot) throw new Error('No such shot.');
+    const kind = KIND_MODEL[shot.kind];
+    const contenders = [...new Set(modelIds)].map((id) => modelById(id));
+    if (contenders.length < 2 || contenders.some((m) => !m)) throw refuse('A bake-off needs at least two known generators.');
+    const odd = contenders.find((m) => m.kind !== kind);
+    if (odd) throw refuse(`${odd.label} makes ${odd.kind}; ${shot.name} is ${kind === 'image' ? 'a still' : 'a video shot'}.`);
+    const batch = store.put('batches', { id: newId('bat'), kind: 'bakeoff', shotId, createdAt: now() });
+    const shared = seed ?? randomSeed();
+    return { batch, results: contenders.map((m) => ({ modelId: m.id, ...render(shotId, { modelId: m.id, seed: shared, batchId: batch.id }) })) };
+  }
+
+  // "This one" — make the generator that made a take the preference for
+  // the look (or for the project, if the film has no look entry).
+  function preferGeneratorOf(takeId) {
+    const take = store.get('takes', takeId);
+    if (!take) throw new Error('No such take.');
+    const kind = modelById(take.modelId).kind;
+    const look = headOfKind('look');
+    setRouting({ entityId: look?.entity.id || null, kind, modelId: take.modelId });
+    return { modelId: take.modelId, kind, scope: look ? 'look' : 'project', lookName: look?.entity.name || null };
   }
 
   // ---------- takes ----------
@@ -441,6 +572,7 @@ export function createStudio({ store = createStore(), adapters = createAdapters(
     createScene, updateScene, createShot, updateShot,
     inspect, applyRefine, setLock,
     render, promote, promotionCheck, promoteApproved, branch, approve, rerender, retryWithFallback,
+    setRouting, routing, handoffSheet, deliver, reportRefusal, cancelHandoff, readBlob, bakeoff, preferGeneratorOf,
     takesOf, currentTake, masterOf, staleness, graph, board, exportManifest,
   };
 }

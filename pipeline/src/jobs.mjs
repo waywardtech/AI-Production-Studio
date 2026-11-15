@@ -11,6 +11,10 @@
 // fault is retried with backoff, a content-filter refusal is not retried
 // at all, since the same recipe would only be refused again.
 //
+// A job can also be "waiting": the work is a person's (a hand-off to a
+// chat subscription), so there is no process to time out or recover.
+// It is never pumped; complete(), fail() or cancel() ends it.
+//
 // States:  queued → running → succeeded
 //                         ↘ failed      (retry / fallback / resume put it back to queued)
 //                         ↘ queued      (transient fault, attempts left)
@@ -116,7 +120,8 @@ export function createQueue({
     const job = store.get('jobs', jobId);
     if (!job) throw new Error('No such job.');
     if (job.status !== 'failed') return job;
-    return store.put('jobs', { ...job, status: 'queued', attempts: 0, runAfter: 0, error: null, finishedAt: null, retriedAt: now() });
+    // Work that was a person's goes back to the person, not to a model.
+    return store.put('jobs', { ...job, status: job.byHand ? 'waiting' : 'queued', attempts: 0, runAfter: 0, error: null, finishedAt: null, retriedAt: now() });
   }
 
   // Re-queues what failed in a batch and leaves what succeeded alone.
@@ -161,5 +166,16 @@ export function createQueue({
     return { requeued, stopped };
   }
 
-  return { enqueue, pump, drain, retry, resumeBatch, recover, byKey, isActive: (id) => active.has(id) };
+  // For work finished outside the queue.
+  const waitingJob = (jobId) => {
+    const job = store.get('jobs', jobId);
+    if (!job) throw new Error('No such job.');
+    if (job.status !== 'waiting') throw Object.assign(new Error(`This job is ${job.status}, not waiting.`), { refusal: true });
+    return job;
+  };
+  const complete = (jobId, result) => store.put('jobs', { ...waitingJob(jobId), status: 'succeeded', result, finishedAt: now() });
+  const fail = (jobId, error) => store.put('jobs', { ...waitingJob(jobId), status: 'failed', finishedAt: now(), error: { ...classifyError(error), attempt: 1, willRetry: false } });
+  const cancel = (jobId) => store.put('jobs', { ...waitingJob(jobId), status: 'cancelled', finishedAt: now() });
+
+  return { complete, fail, cancel, enqueue, pump, drain, retry, resumeBatch, recover, byKey, isActive: (id) => active.has(id) };
 }
